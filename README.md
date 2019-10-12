@@ -20,6 +20,8 @@ The current version provides the following verbs:
 
 This tool also creates a header file with defines for all parameter and com object definitions in the xml. An ETS must be installed on the PC. Currently ETS 4, ETS 5.5, ETS 5.6 and ETS 5.7 are supported. ETS 5.6 is default, other ETS versions can be set with --EtsVersion option.
 
+This project uses dotnet core 3.0.
+
 ### Examples:
 
 - multiplychannels create Sensor
