@@ -18,20 +18,19 @@ The current version provides the following verbs:
 
 - **version**    Display version information.
 
-This tool also creates a header file with defines for all parameter and com object definitions in the xml. An ETS must be installed on the PC. Currently ETS 4, ETS 5.5, ETS 5.6 and ETS 5.7 are supported. ETS 5.6 is default, other ETS versions can be set with --EtsVersion option.
-
+This tool also creates a header file with defines for all parameter and com object definitions in the xml. An ETS must be installed on the PC. Currently ETS 4, ETS 5.5, ETS 5.6 and ETS 5.7 are supported. The correct ETS converter version is automatically found dependent on xmlns of provided xml document.
 This project uses dotnet core 3.0.
 
 ### Examples:
 
 - multiplychannels create Sensor
 
-    Reads Sensor.xml, do sanity chacks, produce Sensor.h, produce Sensor.knxprod using ETS 5.6
+    Reads Sensor.xml, do sanity chacks, produce Sensor.h, produce Sensor.knxprod
 
-- multiplychannels knxprod --EtsVersion=4 -o device.knxpord Sensor.xml
+- multiplychannels knxprod -o device.knxpord Sensor.xml
 
-    Reads Sensor.xml, produce device.knxprod using ETS 4.
+    Reads Sensor.xml, produce device.knxprod
 
-- multiplychannels check --EtsVersion=55 Sensor.xml
+- multiplychannels check Sensor.xml
 
-    Reads Sensor.xml, do sanity checks using ETS 5.5
+    Reads Sensor.xml, do sanity checks

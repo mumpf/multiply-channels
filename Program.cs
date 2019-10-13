@@ -5,24 +5,79 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using CommandLine;
+using System.Linq;
 // using Knx.Ets.Xml.ObjectModel;
 
 //using Knx.Ets.Converter.ConverterEngine;
 
 namespace MultiplyChannels {
+
+    struct EtsVersion {
+        public EtsVersion(string iSubdir, string iEts) {
+            Subdir = iSubdir;
+            ETS = iEts;
+        }
+
+        public string Subdir { get; private set; }
+        public string ETS { get; private set; }
+    }
     class Program {
 
+        private static Dictionary<string, EtsVersion> EtsVersions = new Dictionary<string, EtsVersion>() {
+            {"http://knx.org/xml/project/11", new EtsVersion(@"CV\4.0.1997.50261", "ETS 4")},
+            {"http://knx.org/xml/project/12", new EtsVersion(@"CV\5.0.204.12971", "ETS 5")},
+            {"http://knx.org/xml/project/13", new EtsVersion(@"CV\5.1.84.17602", "ETS 5.5")},
+            {"http://knx.org/xml/project/14", new EtsVersion(@"CV\5.6.241.33672", "ETS 5.6")}
+        };
+        
         private const string gtoolName = "KNX MT";
         private const string gtoolVersion = "5.1.255.16695";
         //installation path of a valid ETS instance (only ETS4 or ETS5 supported)
-        private static string gPathETS = @"C:\Program Files (x86)\ETS";
+        private static string gPathETS = @"C:\Program Files (x86)\ETS5";
 
+        static string FindEtsPath(string iXmlFilename) {
+            string lResult = "";
+            if (File.Exists(iXmlFilename)) {
+                string lXmlContent = File.ReadLines(iXmlFilename).Take(2).Aggregate((s1, s2) => s1 + s2 );
+                int lStart = lXmlContent.IndexOf("xmlns=\"http://knx.org/xml/project/", 0);
+                string lXmlns = lXmlContent.Substring(lStart + 7, 29);
+                int lProjectVersion = int.Parse(lXmlns.Substring(27));
 
-        static bool ProcessSanityChecks(XmlNode iTargetNode, EtsVersions iVersion) {
+                if (EtsVersions.ContainsKey(lXmlns)) {
+                    string lSubdir = EtsVersions[lXmlns].Subdir;
+                    string lEts = EtsVersions[lXmlns].ETS;
+                    string lPath = Path.Combine(gPathETS, lSubdir);
+                    if (!Directory.Exists(lPath)) {
+                        // fallback handling
+                        if (lProjectVersion == 11) {
+                            // for project/11 ETS4 might be installed
+                            lPath = gPathETS.Replace("5", "4");
+                            lEts = "ETS 4";
+                        } else {
+                            // for other versions the required DLL might be in ETS installation dir
+                            // in this case the CV dir contains the previous project conversion dlls
+                            string lTempXmlns = string.Format("http://knx.org/xml/project/{0}", lProjectVersion - 1);
+                            lSubdir = EtsVersions[lTempXmlns].Subdir;
+                            lPath = Path.Combine(gPathETS, lSubdir);
+                            if (Directory.Exists(lPath)) lPath = gPathETS;
+                        }
+                    }
+                    if (Directory.Exists(lPath)) {
+                        lResult = lPath;
+                        Console.WriteLine("Found namespace {1} in xml, will use {0} for conversion...", lEts, lXmlns);
+                    }
+                }
+                if (lResult == "") Console.WriteLine("No valid conversion engine available for xmlns {0}", lXmlns);
+            }
+            return lResult;
+        }
+
+        static bool ProcessSanityChecks(XmlNode iTargetNode) {
 
             Console.WriteLine("Sanity checks... ");
-            Console.Write("- Id-Uniqueness...");
             bool lFail = false;
+
+            Console.Write("- Id-Uniqueness...");
             bool lFailPart = false;
             XmlNodeList lNodes = iTargetNode.SelectNodes("//*[@Id]");
             Dictionary<string, bool> lIds = new Dictionary<string, bool>();
@@ -36,9 +91,10 @@ namespace MultiplyChannels {
                     lIds.Add(lId, true);
                 }
             }
-            if (!lFailPart) Console.WriteLine("finished");
+            if (!lFailPart) Console.WriteLine(" finished");
             lFail = lFail || lFailPart;
 
+            lFailPart = false;
             Console.Write("- RefId-Integrity...");
             lNodes = iTargetNode.SelectNodes("//*[@RefId]");
             foreach (XmlNode lNode in lNodes) {
@@ -51,9 +107,10 @@ namespace MultiplyChannels {
                     }
                 }
             }
-            if (!lFailPart) Console.WriteLine("finished");
+            if (!lFailPart) Console.WriteLine(" finished");
             lFail = lFail || lFailPart;
 
+            lFailPart = false;
             Console.Write("- ParamRefId-Integrity...");
             lNodes = iTargetNode.SelectNodes("//*[@ParamRefId]");
             foreach (XmlNode lNode in lNodes) {
@@ -66,9 +123,10 @@ namespace MultiplyChannels {
                     }
                 }
             }
-            if (!lFailPart) Console.WriteLine("finished");
+            if (!lFailPart) Console.WriteLine(" finished");
             lFail = lFail || lFailPart;
 
+            lFailPart = false;
             Console.Write("- ParameterType-Integrity...");
             lNodes = iTargetNode.SelectNodes("//*[@ParameterType]");
             foreach (XmlNode lNode in lNodes) {
@@ -79,9 +137,10 @@ namespace MultiplyChannels {
                     lFailPart = true;
                 }
             }
-            if (!lFailPart) Console.WriteLine("finished");
+            if (!lFailPart) Console.WriteLine(" finished");
             lFail = lFail || lFailPart;
 
+            lFailPart = false;
             Console.Write("- Serial number...");
             lNodes = iTargetNode.SelectNodes("//*[@SerialNumber]");
             foreach (XmlNode lNode in lNodes) {
@@ -92,24 +151,9 @@ namespace MultiplyChannels {
                     lFailPart = true;
                 }
             }
-            if (!lFailPart) Console.WriteLine("finished");
+            if (!lFailPart) Console.WriteLine(" finished");
             lFail = lFail || lFailPart;
 
-            Console.Write("- xmlns...");
-            if (iTargetNode.NodeType == XmlNodeType.Document) {
-                string lSourceXmlns = ((XmlDocument)iTargetNode).DocumentElement.GetAttribute("xmlns");
-                if (lSourceXmlns == "") {
-                    lSourceXmlns = ((XmlDocument)iTargetNode).DocumentElement.GetAttribute("oldxmlns");
-                }
-                string lTargetXmlns = ProcessInclude.GetNamespace(iVersion);
-                if (lSourceXmlns != lTargetXmlns) {
-                    if (!lFailPart) Console.WriteLine();
-                    Console.WriteLine("  xmlns is {0}, expected is {1}", lSourceXmlns, lTargetXmlns);
-                    lFailPart = true;
-                }
-                if (!lFailPart) Console.WriteLine("finished");
-                lFail = lFail || lFailPart;
-            }
             return !lFail;
         }
 
@@ -140,10 +184,11 @@ namespace MultiplyChannels {
         //     }
         // }
 
-        private static void ExportKnxprod(string iXmlFileName, string iKnxprodFileName) {
+        private static void ExportKnxprod(string iPathETS, string iXmlFileName, string iKnxprodFileName) {
+            if (iPathETS == "") return;
             try {
                 var files = new string[] { iXmlFileName };
-                var asmPath = Path.Combine(gPathETS, "Knx.Ets.Converter.ConverterEngine.dll");
+                var asmPath = Path.Combine(iPathETS, "Knx.Ets.Converter.ConverterEngine.dll");
                 var asm = Assembly.LoadFrom(asmPath);
                 var eng = asm.GetType("Knx.Ets.Converter.ConverterEngine.ConverterEngine");
                 var bas = asm.GetType("Knx.Ets.Converter.ConverterEngine.ConvertBase");
@@ -175,37 +220,6 @@ namespace MultiplyChannels {
             public string XmlFileName {
                 get { return mXmlFileName; }
                 set { mXmlFileName = Path.ChangeExtension(value, "xml"); }
-            }
-            [Option('e', "EtsVersion", Default = "56", Required = false, HelpText = "use dll's of given version", MetaValue = "4,55,56,57")]
-            public string EtsVersion { get; set; } = "56";
-
-            public EtsVersions ParseVersion() {
-                // for ETS5 conversion dll, we need to change the namespace in xml file
-                string lEts = "!!! NO ETS !!!";
-                string lPathEts = "";
-                EtsVersions lResult;
-                if (EtsVersion == "57") {
-                    lResult = EtsVersions.Ets57;
-                    lEts = "ETS-5.7";
-                    lPathEts = "5";
-                } else if (EtsVersion == "56") {
-                    lResult = EtsVersions.Ets56;
-                    lEts = "ETS-5.6";
-                    lPathEts = "5";
-                } else if (EtsVersion == "55") {
-                    lResult = EtsVersions.Ets55;
-                    lEts = "ETS-5.5";
-                    lPathEts = "5";
-                } else {
-                    lResult = EtsVersions.Ets4;
-                    lEts = "ETS-4";
-                    lPathEts = "4";
-                }
-                if (gPathETS.EndsWith("ETS")) {
-                    gPathETS += lPathEts;
-                }
-                Console.WriteLine("Using {0} for conversion", lEts);
-                return lResult;
             }
         }
 
@@ -240,10 +254,10 @@ namespace MultiplyChannels {
             Console.WriteLine("Reading and processing xml file {0}", opts.XmlFileName);
             ProcessInclude lResult = ProcessInclude.Factory(opts.XmlFileName, lHeaderFileName, "");
             lResult.Expand();
-            // for ETS5 conversion dll, we need to change the namespace in xml file
-            lResult.SetNamespace(opts.ParseVersion());
+            // We restore the original namespace in File
+            lResult.SetNamespace();
             XmlDocument lXml = lResult.GetDocument();
-            bool lSuccess = ProcessSanityChecks(lXml, opts.ParseVersion());
+            bool lSuccess = ProcessSanityChecks(lXml);
             string lTempXmlFileName = Path.ChangeExtension(opts.XmlFileName, "out.xml");
             Console.WriteLine("Writing intermediate file to {0}", lTempXmlFileName);
             lXml.Save(lTempXmlFileName);
@@ -251,7 +265,10 @@ namespace MultiplyChannels {
             File.WriteAllText(lHeaderFileName, lResult.HeaderGenerated);
             string lOutputFileName = Path.ChangeExtension(opts.OutputFile, "knxprod");
             if (opts.OutputFile == "") lOutputFileName = Path.ChangeExtension(opts.XmlFileName, "knxprod");
-            if (lSuccess) ExportKnxprod(lTempXmlFileName, lOutputFileName);
+            if (lSuccess) {
+                string lEtsPath = FindEtsPath(lTempXmlFileName);
+                ExportKnxprod(lEtsPath, lTempXmlFileName, lOutputFileName);
+            }
             return 0;
         }
 
@@ -260,15 +277,15 @@ namespace MultiplyChannels {
             Console.WriteLine("Reading and resolving xml file {0}", lFileName);
             ProcessInclude lResult = ProcessInclude.Factory(opts.XmlFileName, "", "");
             lResult.LoadAdvanced(lFileName);
-            return ProcessSanityChecks(lResult.GetDocument(), opts.ParseVersion()) ? 0 : 1;
+            return ProcessSanityChecks(lResult.GetDocument()) ? 0 : 1;
         }
 
         static private int VerbKnxprod(KnxprodOptions opts) {
             string lOutputFileName = Path.ChangeExtension(opts.OutputFile, "knxprod");
             if (opts.OutputFile == "") lOutputFileName = Path.ChangeExtension(opts.XmlFileName, "knxprod");
             Console.WriteLine("Reading xml file {0} writing to {1}", opts.XmlFileName, lOutputFileName);
-            opts.ParseVersion();
-            ExportKnxprod(opts.XmlFileName, lOutputFileName);
+            string lEtsPath = FindEtsPath(opts.XmlFileName);
+            ExportKnxprod(lEtsPath, opts.XmlFileName, lOutputFileName);
             return 0;
         }
     }

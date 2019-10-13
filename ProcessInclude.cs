@@ -6,15 +6,8 @@ using System.Text.RegularExpressions;
 using System.Text;
 
 namespace MultiplyChannels {
-    public enum EtsVersions {
-        Ets4 = 11,
-        Ets55 = 13,
-        Ets56 = 14,
-        Ets57 = 20
-    }
     public class ProcessInclude {
 
-        const string cKnxNamespace = "http://knx.org/xml/project/{0}"; // 11 for ETS4, 14 for ETS5.6, 20 for ETS5.7 (not implemented yet)
         const string cOwnNamespace = "http://github.com/mumpf/multiply-channels";
         private XmlNamespaceManager nsmgr;
         private XmlDocument mDocument = new XmlDocument();
@@ -121,12 +114,12 @@ namespace MultiplyChannels {
             mDocument.Save(Path.ChangeExtension(mXmlFileName, "out.xml"));
         }
 
-        static public string GetNamespace(EtsVersions iVersion) {
-            int lVersion = (int)iVersion;
-            return string.Format(cKnxNamespace, lVersion);
-        }
-        public void SetNamespace(EtsVersions iVersion) {
-            mDocument.DocumentElement.SetAttribute("xmlns", GetNamespace(iVersion));
+        public void SetNamespace() {
+            // we restor the original namespace, if necessary
+            if (mDocument.DocumentElement.GetAttribute("xmlns") == "") {
+                string lXmlns = mDocument.DocumentElement.GetAttribute("oldxmlns");
+                if (lXmlns != "") mDocument.DocumentElement.SetAttribute("xmlns", lXmlns);
+            }
         }
 
         public void Expand() {
@@ -322,6 +315,7 @@ namespace MultiplyChannels {
             string lResult = iName;
             // if (iName.Contains("%C%")) lResult = iName.Remove(0, iName.IndexOf("%C%") + 3);
             lResult = iName.Replace("%C%", "");
+            lResult = lResult.Replace(" ", "_");
             return lResult;
         }
 
