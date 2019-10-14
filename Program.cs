@@ -85,7 +85,7 @@ namespace MultiplyChannels {
                 string lId = lNode.Attributes.GetNamedItem("Id").Value;
                 if (lIds.ContainsKey(lId)) {
                     if (!lFailPart) Console.WriteLine();
-                    Console.WriteLine("  {0} is a duplicate Id in {1}", lId, lNode.NodeName());
+                    Console.WriteLine("  {0} is a duplicate Id in {1}", lId, lNode.NodeAttr("Name"));
                     lFailPart = true;
                 } else {
                     lIds.Add(lId, true);
@@ -102,7 +102,7 @@ namespace MultiplyChannels {
                     string lRefId = lNode.Attributes.GetNamedItem("RefId").Value;
                     if (!lIds.ContainsKey(lRefId)) {
                         if (!lFailPart) Console.WriteLine();
-                        Console.WriteLine("  {0} is referenced in {1} {2}, but not defined", lRefId, lNode.Name, lNode.NodeName());
+                        Console.WriteLine("  {0} is referenced in {1} {2}, but not defined", lRefId, lNode.Name, lNode.NodeAttr("Name"));
                         lFailPart = true;
                     }
                 }
@@ -118,7 +118,7 @@ namespace MultiplyChannels {
                     string lParamRefId = lNode.Attributes.GetNamedItem("ParamRefId").Value;
                     if (!lIds.ContainsKey(lParamRefId)) {
                         if (!lFailPart) Console.WriteLine();
-                        Console.WriteLine("  {0} is referenced in {1} {2}, but not defined", lParamRefId, lNode.Name, lNode.NodeName());
+                        Console.WriteLine("  {0} is referenced in {1} {2}, but not defined", lParamRefId, lNode.Name, lNode.NodeAttr("Name"));
                         lFailPart = true;
                     }
                 }
@@ -133,8 +133,42 @@ namespace MultiplyChannels {
                 string lParameterType = lNode.Attributes.GetNamedItem("ParameterType").Value;
                 if (!lIds.ContainsKey(lParameterType)) {
                     if (!lFailPart) Console.WriteLine();
-                    Console.WriteLine("  {0} is referenced in {1} {2}, but not defined", lParameterType, lNode.Name, lNode.NodeName());
+                    Console.WriteLine("  {0} is referenced in {1} {2}, but not defined", lParameterType, lNode.Name, lNode.NodeAttr("Name"));
                     lFailPart = true;
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" finished");
+            lFail = lFail || lFailPart;
+
+            Console.Write("- Parameter-Name-Uniqueness...");
+            lFailPart = false;
+            lNodes = iTargetNode.SelectNodes("//Parameter[@Name]");
+            Dictionary<string, bool> lParameterNames = new Dictionary<string, bool>();
+            foreach (XmlNode lNode in lNodes) {
+                string lName = lNode.Attributes.GetNamedItem("Name").Value;
+                if (lParameterNames.ContainsKey(lName)) {
+                    if (!lFailPart) Console.WriteLine();
+                    Console.WriteLine("  {0} is a duplicate Name in Parameter '{1}'", lName, lNode.NodeAttr("Text"));
+                    lFailPart = true;
+                } else {
+                    lParameterNames.Add(lName, true);
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" finished");
+            lFail = lFail || lFailPart;
+
+            Console.Write("- ComObject-Name-Uniqueness...");
+            lFailPart = false;
+            lNodes = iTargetNode.SelectNodes("//ComObject[@Name]");
+            Dictionary<string, bool> lKoNames = new Dictionary<string, bool>();
+            foreach (XmlNode lNode in lNodes) {
+                string lName = lNode.Attributes.GetNamedItem("Name").Value;
+                if (lKoNames.ContainsKey(lName)) {
+                    if (!lFailPart) Console.WriteLine();
+                    Console.WriteLine("  {0} is a duplicate Name in ComObject number {1}", lName, lNode.NodeAttr("Number"));
+                    lFailPart = true;
+                } else {
+                    lKoNames.Add(lName, true);
                 }
             }
             if (!lFailPart) Console.WriteLine(" finished");
@@ -216,23 +250,47 @@ namespace MultiplyChannels {
 
         class EtsOptions {
             private string mXmlFileName;
-            [Value(0, MetaName = "xml input file name", HelpText = "Xml input file name")]
+            [Value(0, MetaName = "xml file name", HelpText = "Xml file name", MetaValue = "FILE")]
             public string XmlFileName {
                 get { return mXmlFileName; }
                 set { mXmlFileName = Path.ChangeExtension(value, "xml"); }
             }
         }
 
+        [Verb("new", HelpText = "Create new xml file with an expample ParameterType, Parameter and CommObject")]
+        class NewOptions : CreateOptions {
+            [Option('n', "AppName", Required = true, HelpText = "Application name (in Catalog and necessary for upgrades)", MetaValue = "STRING")]
+            public string ApplicationName { get; set; }
+            [Option('a', "AppNumber", Required = true, HelpText = "Application number (has to be unique per manufacturer)", MetaValue = "INT")]
+            public ushort? ApplicationNumber { get; set; }
+            [Option('w', "HardwareName", Required = false, HelpText = "Hardware name (not visible in ETS, defaults to product name)", MetaValue = "STRING")]
+            public string HardwareName { get; set; }
+            [Option('v', "HardwareVersion", Required = true, HelpText = "Hardware version (not visible in ETS, but required for registration)", MetaValue = "INT")]
+            public ushort? HardwareVersion { get; set; }
+            [Option('s', "SerialNumber", Required = true, HelpText = "Hardware serial number (not visible in ETS, but requered for hardware-id)", MetaValue = "STRING")]
+            public string SerialNumber { get; set; }
+            [Option('m', "MediumType", Required = false, Default = "TP", HelpText = "Medium type", MetaValue = "TP,IP")]
+            public string MediumType { get; set; } = "TP";
+            [Option('#', "OrderNumber", Required = true, HelpText = "Order number (order number in catalog and in property info tab)", MetaValue = "STRING")]
+            public string OrderNumber { get; set; }
+            [Option('x', "ProductName", Required = true, HelpText = "Product name (name in catalog and in property dialog)", MetaValue = "STRING")]
+            public string ProductName { get; set; }
+        }
+
         [Verb("knxprod", HelpText = "Create knxprod file from given xml file")]
         class KnxprodOptions : EtsOptions {
-            [Option('o', "Output", Required = false, HelpText = "output file name")]
+            [Option('o', "Output", Required = false, HelpText = "Output file name", MetaValue = "FILE")]
             public string OutputFile { get; set; } = "";
         }
 
         [Verb("create", HelpText = "Process given xml file with all includes and create knxprod")]
         class CreateOptions : KnxprodOptions {
-            [Option('h', "HeaderFileName", Required = false, HelpText = "Header file name")]
+            [Option('h', "HeaderFileName", Required = false, HelpText = "Header file name", MetaValue = "FILE")]
             public string HeaderFileName { get; set; } = "";
+            [Option('p', "Prefix", Required = false, HelpText = "Prefix for generated contant names in header file", MetaValue = "STRING")]
+            public string Prefix { get; set; } = "";
+            [Option('d', "Debug", Required = false, HelpText = "Additional output of <xmlfile>.debug.xml, this file is the input file for knxprod converter")]
+            public bool Debug { get; set; } = false;
         }
 
         [Verb("check", HelpText = "execute sanity checks on given xml file")]
@@ -240,26 +298,75 @@ namespace MultiplyChannels {
         }
 
         static int Main(string[] args) {
-            return CommandLine.Parser.Default.ParseArguments<CreateOptions, CheckOptions, KnxprodOptions>(args)
+            return CommandLine.Parser.Default.ParseArguments<CreateOptions, CheckOptions, KnxprodOptions, NewOptions>(args)
               .MapResult(
+                (NewOptions opts) => VerbNew(opts),
                 (CreateOptions opts) => VerbCreate(opts),
-                (CheckOptions opts) => VerbCheck(opts),
                 (KnxprodOptions opts) => VerbKnxprod(opts),
+                (CheckOptions opts) => VerbCheck(opts),
                 errs => 1);
+        }
+
+        static private int VerbNew(NewOptions opts) {
+            // checks
+            bool lFail = false;
+            if (opts.ApplicationNumber > 65535) {
+                Console.WriteLine("ApplicationNumber has to be less than 65536!");
+                lFail = true;
+            }
+            if (opts.SerialNumber.Contains("-")) {
+                Console.WriteLine("SerialNumber must not contain a dash (-) character!");
+                lFail = true;
+            }
+            if (opts.OrderNumber.Contains("-")) {
+                Console.WriteLine("OrderNumber must not contain a dash (-) character!");
+                lFail = true;
+            }
+            if (lFail) return 1;
+
+            if (opts.HardwareName == "") opts.HardwareName = opts.ProductName;
+            // create initial xml file
+            string lXmlFile = "";
+            var assembly = Assembly.GetEntryAssembly();
+            var resourceStream = assembly.GetManifestResourceStream("MultiplyChannels.NewDevice.xml");
+            using (var reader = new StreamReader(resourceStream, Encoding.UTF8)) {
+                lXmlFile = reader.ReadToEnd();
+            }
+            lXmlFile = lXmlFile.Replace("%ApplicationName%", opts.ApplicationName);
+            lXmlFile = lXmlFile.Replace("%ApplicationNumber%", opts.ApplicationNumber.ToString());
+            lXmlFile = lXmlFile.Replace("%ApplicationVersion%", "1");
+            lXmlFile = lXmlFile.Replace("%HardwareName%", opts.HardwareName);
+            lXmlFile = lXmlFile.Replace("%HardwareVersion%", opts.HardwareVersion.ToString());
+            lXmlFile = lXmlFile.Replace("%SerialNumber%", opts.SerialNumber);
+            lXmlFile = lXmlFile.Replace("%OrderNumber%", opts.OrderNumber);
+            lXmlFile = lXmlFile.Replace("%ProductName%", opts.ProductName);
+            string lMediumType = "MT-0";
+            string lMaskVersion = "MV-07B0";
+            if (opts.MediumType == "IP") {
+                lMediumType = "MT-5";
+                lMaskVersion = "MV-57B0";
+            }
+            lXmlFile = lXmlFile.Replace("%MaskVersion%", lMaskVersion);
+            lXmlFile = lXmlFile.Replace("%MediumType%", lMediumType);
+            File.WriteAllText(opts.XmlFileName, lXmlFile);
+            return VerbCreate(opts);
         }
 
         static private int VerbCreate(CreateOptions opts) {
             string lHeaderFileName = Path.ChangeExtension(opts.XmlFileName, "h");
             if (opts.HeaderFileName != "") lHeaderFileName = opts.HeaderFileName;
             Console.WriteLine("Reading and processing xml file {0}", opts.XmlFileName);
-            ProcessInclude lResult = ProcessInclude.Factory(opts.XmlFileName, lHeaderFileName, "");
+            ProcessInclude lResult = ProcessInclude.Factory(opts.XmlFileName, lHeaderFileName, opts.Prefix);
             lResult.Expand();
             // We restore the original namespace in File
             lResult.SetNamespace();
             XmlDocument lXml = lResult.GetDocument();
             bool lSuccess = ProcessSanityChecks(lXml);
-            string lTempXmlFileName = Path.ChangeExtension(opts.XmlFileName, "out.xml");
-            Console.WriteLine("Writing intermediate file to {0}", lTempXmlFileName);
+            string lTempXmlFileName = Path.GetTempFileName();
+            File.Delete(lTempXmlFileName);
+            if (opts.Debug) lTempXmlFileName = opts.XmlFileName;
+            lTempXmlFileName = Path.ChangeExtension(lTempXmlFileName, "debug.xml");
+            if (opts.Debug) Console.WriteLine("Writing debug file to {0}", lTempXmlFileName);
             lXml.Save(lTempXmlFileName);
             Console.WriteLine("Writing header file to {0}", lHeaderFileName);
             File.WriteAllText(lHeaderFileName, lResult.HeaderGenerated);
@@ -269,6 +376,7 @@ namespace MultiplyChannels {
                 string lEtsPath = FindEtsPath(lTempXmlFileName);
                 ExportKnxprod(lEtsPath, lTempXmlFileName, lOutputFileName);
             }
+            if (!opts.Debug) File.Delete(lTempXmlFileName);
             return 0;
         }
 

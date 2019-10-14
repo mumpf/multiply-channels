@@ -12,7 +12,7 @@
             "program": "${workspaceFolder}/bin/Debug/netcoreapp3.0/MultiplyChannels.dll",
             "args": [
                 "create",
-                "${env:USERPROFILE}/Documents/PlatformIO/Projects/knx-sensor/src/Sensormodul"
+                "${env:USERPROFILE}/Documents/PlatformIO/Projects/knx/examples/knx-sonoffS20/knx-sonoffS20"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -25,7 +25,14 @@
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/bin/Debug/netcoreapp3.0/MultiplyChannels.dll",
             "args": [
-                "create",
+                "new",
+                "--AppName=AppName",
+                "--AppNumber=543",
+                "--SerialNumber=SERIAL",
+                "--OrderNumber=ORDER",
+                "--ProductName=ProductName",
+                "--HardwareName=HardwareName",
+                "--HardwareVersion=12",
                 "Check.xml"
             ],
             "cwd": "${workspaceFolder}",

@@ -10,14 +10,12 @@ namespace MultiplyChannels {
             return lResult;
         }
 
-        public static string NodeName(this XmlNode iNode) {
+        public static string NodeAttr(this XmlNode iNode, string iAttributeName) {
             string lResult = "";
-            XmlNode lAttribute = iNode.Attributes.GetNamedItem("Name");
+            XmlNode lAttribute = iNode.Attributes.GetNamedItem(iAttributeName);
             if (lAttribute != null) lResult = lAttribute.Value.ToString();
             return lResult;
         }
-
-
     }
 }
 

@@ -69,6 +69,7 @@ namespace MultiplyChannels {
         private ProcessInclude(string iXmlFileName, string iHeaderFileName, string iHeaderPrefixName) {
             mXmlFileName = iXmlFileName;
             mHeaderFileName = iHeaderFileName;
+            if (iHeaderPrefixName != "" && !iHeaderPrefixName.EndsWith('_')) iHeaderPrefixName += "_";
             mHeaderPrefixName = iHeaderPrefixName;
         }
 
@@ -87,13 +88,13 @@ namespace MultiplyChannels {
                 StreamReader lHeaderFile = File.OpenText(iHeaderFileName);
                 string lHeaderFileContent = lHeaderFile.ReadToEnd();
                 lHeaderFile.Close();
-                mChannelCount = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "_Channels");
-                mKoOffset = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "_KoOffset");
+                mChannelCount = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "Channels");
+                mKoOffset = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "KoOffset");
             } else {
                 mChannelCount = 1;
                 mKoOffset = 1;
             }
-            // mKoBlockSize = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "_KoBlockSize");
+            // mKoBlockSize = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "KoBlockSize");
             return (mChannelCount >= 0) && (mKoOffset > 0);
         }
 
@@ -264,9 +265,12 @@ namespace MultiplyChannels {
             XmlNode lHardwareVersionAttribute = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/Hardware/Hardware/@VersionNumber");
             int lHardwareVersion = int.Parse(lHardwareVersionAttribute.Value);
             XmlNode lRegistrationNumber = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/Hardware/Hardware/Hardware2Programs/Hardware2Program/RegistrationInfo/@RegistrationNumber");
-            lRegistrationNumber.Value = string.Format("0001/{0}{1}", lHardwareVersion, lApplicationVersion);
-            Console.WriteLine("- RegistrationVersion is: {0}", lRegistrationNumber.Value);
-
+            if (lRegistrationNumber == null) {
+                Console.WriteLine("- Missing 'RegistrationVersion', no updates via 'ReplacesVersion' in ETS possible!");
+            } else {
+                lRegistrationNumber.Value = string.Format("0001/{0}{1}", lHardwareVersion, lApplicationVersion);
+                Console.WriteLine("- RegistrationVersion is: {0}", lRegistrationNumber.Value);
+            }
             // Add ReplacesVersions 
             if (lReplacesVersionsAttribute != null) {
                 string lReplacesVersions = lReplacesVersionsAttribute.Value;
@@ -339,9 +343,9 @@ namespace MultiplyChannels {
                 mHeaderKoBlockGenerated = ExportHeaderKo(lOut, iHeaderPrefixName);
                 if (mHeaderKoBlockGenerated) {
                     cOut.AppendLine("// Communication objects per channel (multiple occurance)");
-                    cOut.AppendFormat("#define {0}_KoOffset {1}", iHeaderPrefixName, mKoOffset);
+                    cOut.AppendFormat("#define {0}KoOffset {1}", iHeaderPrefixName, mKoOffset);
                     cOut.AppendLine();
-                    cOut.AppendFormat("#define {0}_KoBlockSize {1}", iHeaderPrefixName, mKoBlockSize);
+                    cOut.AppendFormat("#define {0}KoBlockSize {1}", iHeaderPrefixName, mKoBlockSize);
                     cOut.AppendLine();
                     cOut.Append(lOut);
                 }
@@ -353,7 +357,7 @@ namespace MultiplyChannels {
             bool lResult = false;
             foreach (XmlNode lNode in lNodes) {
                 string lNumber = ReplaceKoTemplate(lNode.Attributes.GetNamedItemValueOrEmpty("Number"), 1, null);
-                cOut.AppendFormat("#define {0}_Ko{1} {2}", iHeaderPrefixName, ReplaceChannelName(lNode.NodeName()), lNumber);
+                cOut.AppendFormat("#define {0}Ko{1} {2}", iHeaderPrefixName, ReplaceChannelName(lNode.NodeAttr("Name")), lNumber);
                 cOut.AppendLine();
                 lResult = true;
             }
@@ -371,13 +375,13 @@ namespace MultiplyChannels {
 
         public void ExportHeaderParameterBlock(StringBuilder cOut, XmlNode iParameterTypesNode, string iHeaderPrefixName) {
             if (!mHeaderParameterBlockGenerated) {
-                cOut.AppendFormat("#define {0}_Channels {1}", iHeaderPrefixName, mChannelCount);
+                cOut.AppendFormat("#define {0}Channels {1}", iHeaderPrefixName, mChannelCount);
                 cOut.AppendLine();
                 cOut.AppendLine();
                 cOut.AppendLine("// Parameter per channel");
-                cOut.AppendFormat("#define {0}_ParamBlockOffset {1}", iHeaderPrefixName, mParameterBlockOffset);
+                cOut.AppendFormat("#define {0}ParamBlockOffset {1}", iHeaderPrefixName, mParameterBlockOffset);
                 cOut.AppendLine();
-                cOut.AppendFormat("#define {0}_ParamBlockSize {1}", iHeaderPrefixName, mParameterBlockSize);
+                cOut.AppendFormat("#define {0}ParamBlockSize {1}", iHeaderPrefixName, mParameterBlockSize);
                 cOut.AppendLine();
                 int lSize = ExportHeaderParameter(cOut, iParameterTypesNode, iHeaderPrefixName);
                 // if (lSize != mParameterBlockSize) throw new ArgumentException(string.Format("ParameterBlockSize {0} calculation differs from header filie calculated ParameterBlockSize {1}", mParameterBlockSize, lSize));
@@ -430,11 +434,11 @@ namespace MultiplyChannels {
                         //output for bit based parameters 
                         lType = string.Format("{0} Bit{1}, Bit {2}", lBits, (lBits == 1) ? "" : "s", (7 - lBitOffset));
                         if (lBits > 1) lType = string.Format("{0}-{1}", lType, 8 - lBits - lBitOffset);
-                        cOut.AppendFormat("#define {3}_{0,-25} {1,2}      // {2}", lName, lOffset, lType, iHeaderPrefixName);
+                        cOut.AppendFormat("#define {3}{0,-25} {1,2}      // {2}", lName, lOffset, lType, iHeaderPrefixName);
                     } else if (lDirectType) {
-                        cOut.AppendFormat("#define {3}_{0,-25} {1,2}      // {2}", lName, lOffset, lType, iHeaderPrefixName);
+                        cOut.AppendFormat("#define {3}{0,-25} {1,2}      // {2}", lName, lOffset, lType, iHeaderPrefixName);
                     } else {
-                        cOut.AppendFormat("#define {4}_{0,-25} {1,2}      // {3}{2}_t", lName, lOffset, lBits, lType, iHeaderPrefixName);
+                        cOut.AppendFormat("#define {4}{0,-25} {1,2}      // {3}{2}_t", lName, lOffset, lBits, lType, iHeaderPrefixName);
                     }
                     cOut.AppendLine();
                 }
