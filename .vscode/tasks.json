@@ -40,8 +40,9 @@
             "problemMatcher": "$tsc"
         },
         {
-            "label": "publish and copy to bin",
+            "label": "build, publish and copy to bin",
             "dependsOn": [
+                "build",
                 "publish",
                 "copy to bin"
             ],

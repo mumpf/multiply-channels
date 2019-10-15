@@ -250,7 +250,7 @@ namespace MultiplyChannels {
 
         class EtsOptions {
             private string mXmlFileName;
-            [Value(0, MetaName = "xml file name", HelpText = "Xml file name", MetaValue = "FILE")]
+            [Value(0, MetaName = "xml file name", Required = true, HelpText = "Xml file name", MetaValue = "FILE")]
             public string XmlFileName {
                 get { return mXmlFileName; }
                 set { mXmlFileName = Path.ChangeExtension(value, "xml"); }
@@ -259,22 +259,43 @@ namespace MultiplyChannels {
 
         [Verb("new", HelpText = "Create new xml file with an expample ParameterType, Parameter and CommObject")]
         class NewOptions : CreateOptions {
-            [Option('n', "AppName", Required = true, HelpText = "Application name (in Catalog and necessary for upgrades)", MetaValue = "STRING")]
-            public string ApplicationName { get; set; }
-            [Option('a', "AppNumber", Required = true, HelpText = "Application number (has to be unique per manufacturer)", MetaValue = "INT")]
-            public ushort? ApplicationNumber { get; set; }
-            [Option('w', "HardwareName", Required = false, HelpText = "Hardware name (not visible in ETS, defaults to product name)", MetaValue = "STRING")]
-            public string HardwareName { get; set; }
-            [Option('v', "HardwareVersion", Required = true, HelpText = "Hardware version (not visible in ETS, but required for registration)", MetaValue = "INT")]
-            public ushort? HardwareVersion { get; set; }
-            [Option('s', "SerialNumber", Required = true, HelpText = "Hardware serial number (not visible in ETS, but requered for hardware-id)", MetaValue = "STRING")]
-            public string SerialNumber { get; set; }
-            [Option('m', "MediumType", Required = false, Default = "TP", HelpText = "Medium type", MetaValue = "TP,IP")]
-            public string MediumType { get; set; } = "TP";
-            [Option('#', "OrderNumber", Required = true, HelpText = "Order number (order number in catalog and in property info tab)", MetaValue = "STRING")]
-            public string OrderNumber { get; set; }
-            [Option('x', "ProductName", Required = true, HelpText = "Product name (name in catalog and in property dialog)", MetaValue = "STRING")]
+            [Option('x', "ProductName", Required = true, HelpText = "Product name - appears in catalog and in property dialog", MetaValue = "STRING")]
             public string ProductName { get; set; }
+            [Option('n', "AppName", Required = false, HelpText = "(Default: Product name) Application name - appears in catalog and necessary for application upgrades", MetaValue = "STRING")]
+            public string ApplicationName { get; set; } = "";
+            [Option('a', "AppNumber", Required = true, HelpText = "Application number - has to be unique per manufacturer", MetaValue = "INT")]
+            public int? ApplicationNumber { get; set; }
+            [Option('y', "AppVersion", Required = false, Default = 1, HelpText = "Application version - necessary for application upgrades", MetaValue = "INT")]
+            public int? ApplicationVersion { get; set; } = 1;
+            [Option('w', "HardwareName", Required = false, HelpText = "(Default: Product name) Hardware name - not visible in ETS", MetaValue = "STRING")]
+            public string HardwareName { get; set; } = "";
+            [Option('v', "HardwareVersion", Required = false, Default = 1, HelpText = "Hardware version - not visible in ETS, required for registration", MetaValue = "INT")]
+            public int? HardwareVersion { get; set; } = 1;
+            [Option('s', "SerialNumber", Required = false, HelpText = "(Default: Application number) Hardware serial number - not visible in ETS, requered for hardware-id", MetaValue = "STRING")]
+            public string SerialNumber { get; set; } = "";
+            [Option('m', "MediumType", Required = false, Default = "TP", HelpText = "Medium type", MetaValue = "TP,IP,both")]
+            public string MediumType { get; set; } = "TP";
+            [Option('#', "OrderNumber", Required = false, HelpText = "(Default: Application number) Order number - appears in catalog and in property info tab", MetaValue = "STRING")]
+            public string OrderNumber { get; set; } = "";
+
+            public string MediumTypes {
+                get {
+                    string lResult = "MT-0";
+                    if (MediumType == "IP") {
+                        lResult = "MT-5";
+                    } else if (MediumType == "both") {
+                        lResult = "MT-0 MT-5";
+                    }
+                    return lResult;
+                }
+            }
+            public string MaskVersion {
+                get {
+                    string lResult = "MV-07B0";
+                    if (MediumType == "IP") lResult = "MV-57B0";
+                    return lResult;
+                }
+            }
         }
 
         [Verb("knxprod", HelpText = "Create knxprod file from given xml file")]
@@ -308,6 +329,12 @@ namespace MultiplyChannels {
         }
 
         static private int VerbNew(NewOptions opts) {
+            // Handle defaults
+            if (opts.ApplicationName == "") opts.ApplicationName = opts.ProductName;
+            if (opts.HardwareName == "") opts.HardwareName = opts.ProductName;
+            if (opts.SerialNumber == "") opts.SerialNumber = opts.ApplicationNumber.ToString();
+            if (opts.OrderNumber == "") opts.OrderNumber = opts.ApplicationNumber.ToString();
+
             // checks
             bool lFail = false;
             if (opts.ApplicationNumber > 65535) {
@@ -324,7 +351,6 @@ namespace MultiplyChannels {
             }
             if (lFail) return 1;
 
-            if (opts.HardwareName == "") opts.HardwareName = opts.ProductName;
             // create initial xml file
             string lXmlFile = "";
             var assembly = Assembly.GetEntryAssembly();
@@ -334,20 +360,15 @@ namespace MultiplyChannels {
             }
             lXmlFile = lXmlFile.Replace("%ApplicationName%", opts.ApplicationName);
             lXmlFile = lXmlFile.Replace("%ApplicationNumber%", opts.ApplicationNumber.ToString());
-            lXmlFile = lXmlFile.Replace("%ApplicationVersion%", "1");
+            lXmlFile = lXmlFile.Replace("%ApplicationVersion%", opts.ApplicationVersion.ToString());
             lXmlFile = lXmlFile.Replace("%HardwareName%", opts.HardwareName);
             lXmlFile = lXmlFile.Replace("%HardwareVersion%", opts.HardwareVersion.ToString());
             lXmlFile = lXmlFile.Replace("%SerialNumber%", opts.SerialNumber);
             lXmlFile = lXmlFile.Replace("%OrderNumber%", opts.OrderNumber);
             lXmlFile = lXmlFile.Replace("%ProductName%", opts.ProductName);
-            string lMediumType = "MT-0";
-            string lMaskVersion = "MV-07B0";
-            if (opts.MediumType == "IP") {
-                lMediumType = "MT-5";
-                lMaskVersion = "MV-57B0";
-            }
-            lXmlFile = lXmlFile.Replace("%MaskVersion%", lMaskVersion);
-            lXmlFile = lXmlFile.Replace("%MediumType%", lMediumType);
+            lXmlFile = lXmlFile.Replace("%MaskVersion%", opts.MaskVersion);
+            lXmlFile = lXmlFile.Replace("%MediumTypes%", opts.MediumTypes);
+            Console.WriteLine("Creating xml file {0}", opts.XmlFileName);
             File.WriteAllText(opts.XmlFileName, lXmlFile);
             return VerbCreate(opts);
         }
@@ -355,7 +376,7 @@ namespace MultiplyChannels {
         static private int VerbCreate(CreateOptions opts) {
             string lHeaderFileName = Path.ChangeExtension(opts.XmlFileName, "h");
             if (opts.HeaderFileName != "") lHeaderFileName = opts.HeaderFileName;
-            Console.WriteLine("Reading and processing xml file {0}", opts.XmlFileName);
+            Console.WriteLine("Processing xml file {0}", opts.XmlFileName);
             ProcessInclude lResult = ProcessInclude.Factory(opts.XmlFileName, lHeaderFileName, opts.Prefix);
             lResult.Expand();
             // We restore the original namespace in File
