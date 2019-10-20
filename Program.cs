@@ -366,7 +366,7 @@ namespace MultiplyChannels {
             }
         }
 
-        [Verb("new", HelpText = "Create new xml file with an expample ParameterType, Parameter and CommObject")]
+        [Verb("new", HelpText = "Create new xml file with a fully commented and working mini exaple")]
         class NewOptions : CreateOptions {
             [Option('x', "ProductName", Required = true, HelpText = "Product name - appears in catalog and in property dialog", MetaValue = "STRING")]
             public string ProductName { get; set; }

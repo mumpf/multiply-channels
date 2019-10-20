@@ -13,7 +13,7 @@ The current version provides the following verbs:
 
 - **knxprod**    Create knxprod file from given xml file without checks
 
-- **new**        Create new xml file with an expample ParameterType, Parameter and CommObject
+- **new**        Create new xml file with a fully commented and working mini exaple
 
 - **help**       Display more information on a specific command.
 
@@ -39,3 +39,15 @@ This project uses dotnet core 3.0.
 - multiplychannels check Sensor.xml
 
     Reads Sensor.xml, do sanity checks
+
+### Tipps:
+
+If all sanity checks were OK and the knxprod file was created, there might be still problems using this file in ETS. Because the user is editing an xml file, there might be many other problems there, which are not checked by this tool yet.
+
+As a general hint:
+
+- if there is a problem importing the knxprod file into the product catalog (import function in ETS), there is usually a problem with Parameters-, ParameterTypes-, ComObjects-Section or the document structure itself. I.e. a dash in SerialNumber prevented an import, even though the creation of knxprod worked fine (in the meantime there is a check for SerialNumber).
+
+- if import was successful, but you cannot add the device to your project, usually there is a problem in Dynamic-, ParameterRef-, ComObjectRef-Section.
+
+If you find a situation, which is not yet checked but leads to errors in ETS, tell me and I will add a new check. Or create a pull request...
