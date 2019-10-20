@@ -30,7 +30,7 @@ namespace MultiplyChannels {
             {"http://knx.org/xml/project/13", new EtsVersion(@"CV\5.1.84.17602", "ETS 5.5")},
             {"http://knx.org/xml/project/14", new EtsVersion(@"CV\5.6.241.33672", "ETS 5.6")}
         };
-        
+
         private const string gtoolName = "KNX MT";
         private const string gtoolVersion = "5.1.255.16695";
         //installation path of a valid ETS instance (only ETS4 or ETS5 supported)
@@ -39,7 +39,7 @@ namespace MultiplyChannels {
         static string FindEtsPath(string iXmlFilename) {
             string lResult = "";
             if (File.Exists(iXmlFilename)) {
-                string lXmlContent = File.ReadLines(iXmlFilename).Take(2).Aggregate((s1, s2) => s1 + s2 );
+                string lXmlContent = File.ReadLines(iXmlFilename).Take(2).Aggregate((s1, s2) => s1 + s2);
                 int lStart = lXmlContent.IndexOf("xmlns=\"http://knx.org/xml/project/", 0);
                 string lXmlns = lXmlContent.Substring(lStart + 7, 29);
                 int lProjectVersion = int.Parse(lXmlns.Substring(27));
@@ -73,8 +73,29 @@ namespace MultiplyChannels {
             return lResult;
         }
 
+        static void WriteFail(ref bool iFail, string iFormat, params object[] iParams) {
+            if (!iFail) Console.WriteLine();
+            Console.WriteLine("  --> " + iFormat, iParams);
+            iFail = true;
+        }
+
+        // Parameter cache
+        static Dictionary<string, XmlNode> gParameters = new Dictionary<string, XmlNode>();
+
+        static XmlNode GetParameterById(XmlNode iRootNode, string iId) {
+            XmlNode lResult = null;
+            if (gParameters.ContainsKey(iId)) {
+                lResult = gParameters[iId];
+            } else {
+                lResult = iRootNode.SelectSingleNode(string.Format("//Parameter[@Id='{0}']", iId));
+                if (lResult != null) gParameters.Add(iId, lResult);
+            }
+            return lResult;
+        }
+
         static bool ProcessSanityChecks(XmlNode iTargetNode) {
 
+            Console.WriteLine();
             Console.WriteLine("Sanity checks... ");
             bool lFail = false;
 
@@ -85,14 +106,12 @@ namespace MultiplyChannels {
             foreach (XmlNode lNode in lNodes) {
                 string lId = lNode.Attributes.GetNamedItem("Id").Value;
                 if (lIds.ContainsKey(lId)) {
-                    if (!lFailPart) Console.WriteLine();
-                    Console.WriteLine("  {0} is a duplicate Id in {1}", lId, lNode.NodeAttr("Name"));
-                    lFailPart = true;
+                    WriteFail(ref lFailPart, "{0} is a duplicate Id in {1}", lId, lNode.NodeAttr("Name"));
                 } else {
                     lIds.Add(lId, true);
                 }
             }
-            if (!lFailPart) Console.WriteLine(" finished");
+            if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
             lFailPart = false;
@@ -102,13 +121,11 @@ namespace MultiplyChannels {
                 if (lNode.Name != "Manufacturer") {
                     string lRefId = lNode.Attributes.GetNamedItem("RefId").Value;
                     if (!lIds.ContainsKey(lRefId)) {
-                        if (!lFailPart) Console.WriteLine();
-                        Console.WriteLine("  {0} is referenced in {1} {2}, but not defined", lRefId, lNode.Name, lNode.NodeAttr("Name"));
-                        lFailPart = true;
+                        WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lRefId, lNode.Name, lNode.NodeAttr("Name"));
                     }
                 }
             }
-            if (!lFailPart) Console.WriteLine(" finished");
+            if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
             lFailPart = false;
@@ -118,13 +135,11 @@ namespace MultiplyChannels {
                 if (lNode.Name != "Manufacturer") {
                     string lParamRefId = lNode.Attributes.GetNamedItem("ParamRefId").Value;
                     if (!lIds.ContainsKey(lParamRefId)) {
-                        if (!lFailPart) Console.WriteLine();
-                        Console.WriteLine("  {0} is referenced in {1} {2}, but not defined", lParamRefId, lNode.Name, lNode.NodeAttr("Name"));
-                        lFailPart = true;
+                        WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lParamRefId, lNode.Name, lNode.NodeAttr("Name"));
                     }
                 }
             }
-            if (!lFailPart) Console.WriteLine(" finished");
+            if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
             lFailPart = false;
@@ -133,12 +148,10 @@ namespace MultiplyChannels {
             foreach (XmlNode lNode in lNodes) {
                 string lParameterType = lNode.Attributes.GetNamedItem("ParameterType").Value;
                 if (!lIds.ContainsKey(lParameterType)) {
-                    if (!lFailPart) Console.WriteLine();
-                    Console.WriteLine("  {0} is referenced in {1} {2}, but not defined", lParameterType, lNode.Name, lNode.NodeAttr("Name"));
-                    lFailPart = true;
+                    WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lParameterType, lNode.Name, lNode.NodeAttr("Name"));
                 }
             }
-            if (!lFailPart) Console.WriteLine(" finished");
+            if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
             Console.Write("- Parameter-Name-Uniqueness...");
@@ -148,14 +161,41 @@ namespace MultiplyChannels {
             foreach (XmlNode lNode in lNodes) {
                 string lName = lNode.Attributes.GetNamedItem("Name").Value;
                 if (lParameterNames.ContainsKey(lName)) {
-                    if (!lFailPart) Console.WriteLine();
-                    Console.WriteLine("  {0} is a duplicate Name in Parameter '{1}'", lName, lNode.NodeAttr("Text"));
-                    lFailPart = true;
+                    WriteFail(ref lFailPart, "{0} is a duplicate Name in Parameter '{1}'", lName, lNode.NodeAttr("Text"));
                 } else {
                     lParameterNames.Add(lName, true);
                 }
             }
-            if (!lFailPart) Console.WriteLine(" finished");
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
+            lFailPart = false;
+            Console.Write("- Parameter-Value-Integrity...");
+            lNodes = iTargetNode.SelectNodes("//Parameter");
+            foreach (XmlNode lNode in lNodes) {
+                // we add the node to parameter cache
+                gParameters.Add(lNode.NodeAttr("Id"), lNode);
+                string lMessage = string.Format("Parameter {0}", lNode.NodeAttr("Name"));
+                string lParameterValue = lNode.NodeAttr("Value", null);
+                if (lParameterValue == null) {
+                    WriteFail(ref lFailPart, "{0} has no Value attribute", lMessage);
+                }
+                lFailPart = CheckParameterValueIntegrity(iTargetNode, lFailPart, lNode, lParameterValue, lMessage);
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
+            lFailPart = false;
+            Console.Write("- ParameterRef-Value-Integrity...");
+            lNodes = iTargetNode.SelectNodes("//ParameterRef[@Value]");
+            foreach (XmlNode lNode in lNodes) {
+                string lParameterRefValue = lNode.NodeAttr("Value");
+                // find parameter
+                XmlNode lParameterNode = GetParameterById(iTargetNode, lNode.NodeAttr("RefId"));
+                string lMessage = string.Format("ParameterRef {0}, referencing Parameter {1},", lNode.NodeAttr("Id"), lParameterNode.NodeAttr("Name"));
+                lFailPart = CheckParameterValueIntegrity(iTargetNode, lFailPart, lParameterNode, lParameterRefValue, lMessage);
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
             Console.Write("- ComObject-Name-Uniqueness...");
@@ -165,14 +205,12 @@ namespace MultiplyChannels {
             foreach (XmlNode lNode in lNodes) {
                 string lName = lNode.Attributes.GetNamedItem("Name").Value;
                 if (lKoNames.ContainsKey(lName)) {
-                    if (!lFailPart) Console.WriteLine();
-                    Console.WriteLine("  {0} is a duplicate Name in ComObject number {1}", lName, lNode.NodeAttr("Number"));
-                    lFailPart = true;
+                    WriteFail(ref lFailPart, "{0} is a duplicate Name in ComObject number {1}", lName, lNode.NodeAttr("Number"));
                 } else {
                     lKoNames.Add(lName, true);
                 }
             }
-            if (!lFailPart) Console.WriteLine(" finished");
+            if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
             Console.Write("- Id-Namespace...");
@@ -188,18 +226,14 @@ namespace MultiplyChannels {
                     var lMatch = Regex.Match(lNode.Value, "-[0-9A-F]{4}-[0-9A-F]{2}-[0-9A-F]{4}");
                     if (lMatch.Success) {
                         if (lMatch.Value != lRefNs) {
-                            if (!lFailPart) Console.WriteLine();
                             XmlElement lElement = ((XmlAttribute)lNode).OwnerElement;
-                            Console.WriteLine("  {0} of node {2} {3} is in a different namespace than application namespace {1}", lMatch.Value, lRefNs, lElement.Name, lElement.NodeAttr("Name"));
-                            lFailPart = true;
+                            WriteFail(ref lFailPart, "{0} of node {2} {3} is in a different namespace than application namespace {1}", lMatch.Value, lRefNs, lElement.Name, lElement.NodeAttr("Name"));
                         }
                     }
                 }
             }
-            if (!lFailPart) Console.WriteLine(" finished");
+            if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
-
-
 
             lFailPart = false;
             Console.Write("- Serial number...");
@@ -207,15 +241,63 @@ namespace MultiplyChannels {
             foreach (XmlNode lNode in lNodes) {
                 string lSerialNumber = lNode.Attributes.GetNamedItem("SerialNumber").Value;
                 if (lSerialNumber.Contains("-")) {
-                    if (!lFailPart) Console.WriteLine();
-                    Console.WriteLine("  Hardware.SerialNumber={0}, it contains a dash (-), this will cause problems in knxprod.", lSerialNumber);
-                    lFailPart = true;
+                    WriteFail(ref lFailPart, "Hardware.SerialNumber={0}, it contains a dash (-), this will cause problems in knxprod.", lSerialNumber);
                 }
             }
-            if (!lFailPart) Console.WriteLine(" finished");
+            if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
             return !lFail;
+        }
+
+        private static bool CheckParameterValueIntegrity(XmlNode iTargetNode, bool iFailPart, XmlNode iParameterNode, string iValue, string iMessage) {
+            string lParameterType = iParameterNode.NodeAttr("ParameterType");
+            if (lParameterType == "") {
+                WriteFail(ref iFailPart, "Parameter {0} has no ParameterType attribute", iParameterNode.NodeAttr("Name"));
+            }
+            if (iValue != null && lParameterType != "") {
+                // find parameter type
+                XmlNode lParameterTypeNode = iTargetNode.SelectSingleNode(string.Format("//ParameterType[@Id='{0}']", lParameterType));
+                if (lParameterTypeNode != null) {
+                    // get first child ignoring comments
+                    XmlNode lChild = lParameterTypeNode.ChildNodes[0];
+                    while (lChild != null && lChild.NodeType != XmlNodeType.Element) lChild = lChild.NextSibling;
+                    switch (lChild.Name) {
+                        case "TypeNumber":
+                            int lDummyInt;
+                            bool lSuccess = int.TryParse(iValue, out lDummyInt);
+                            if (!lSuccess) {
+                                WriteFail(ref iFailPart, "Value of {0} cannot be converted to a number, value is '{1}'", iMessage, iValue);
+                            }
+                            break;
+                        case "TypeFloat":
+                            float lDummyFloat;
+                            lSuccess = float.TryParse(iValue, out lDummyFloat);
+                            if (!lSuccess || iValue.Contains(",")) {
+                                WriteFail(ref iFailPart, "Value of {0} cannot be converted to a float, value is '{1}'", iMessage, iValue);
+                            }
+                            break;
+                        case "TypeRestriction":
+                            lSuccess = false;
+                            foreach (XmlNode lEnumeration in lChild.ChildNodes) {
+                                if (lEnumeration.Name == "Enumeration") {
+                                    if (lEnumeration.NodeAttr("Value") == iValue) {
+                                        lSuccess = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!lSuccess) {
+                                WriteFail(ref iFailPart, "Value of {0} is not contained in enumeration {2}, value is '{1}'", iMessage, iValue, lParameterType);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+
+            return iFailPart;
         }
 
         #region Reflection
@@ -423,6 +505,8 @@ namespace MultiplyChannels {
             if (lSuccess) {
                 string lEtsPath = FindEtsPath(lTempXmlFileName);
                 ExportKnxprod(lEtsPath, lTempXmlFileName, lOutputFileName);
+            } else {
+                Console.WriteLine("--> Skipping creation of {0} due to check errors! <--", lOutputFileName);
             }
             if (!opts.Debug) File.Delete(lTempXmlFileName);
             return 0;

@@ -10,8 +10,8 @@ namespace MultiplyChannels {
             return lResult;
         }
 
-        public static string NodeAttr(this XmlNode iNode, string iAttributeName) {
-            string lResult = "";
+        public static string NodeAttr(this XmlNode iNode, string iAttributeName, string iDefault = "") {
+            string lResult = iDefault;
             XmlNode lAttribute = iNode.Attributes.GetNamedItem(iAttributeName);
             if (lAttribute != null) lResult = lAttribute.Value.ToString();
             return lResult;

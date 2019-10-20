@@ -287,7 +287,7 @@ namespace MultiplyChannels {
                 XmlNode lMemory = iParameter.SelectSingleNode("Memory");
                 if (lMemory != null) {
                     // we calcucalte the size only, if the parameter uses some memory in the device storage
-                    string lParameterTypeId = iParameter.Attributes.GetNamedItem("ParameterType").Value;
+                    string lParameterTypeId = iParameter.NodeAttr("ParameterType");
                     XmlNode lParameterType = iParameterTypesNode.SelectSingleNode(string.Format("ParameterType[@Id='{0}']", lParameterTypeId));
                     if (lParameterType != null) {
                         XmlNode lSizeInBitAttribute = lParameterType.SelectSingleNode("*/@SizeInBit");
@@ -399,7 +399,7 @@ namespace MultiplyChannels {
                 while (lMemory != null && lMemory.NodeType == XmlNodeType.Comment) lMemory = lMemory.NextSibling;
                 if (lMemory != null && iParameterTypesNode != null) {
                     // parse parameter type to fill additional information
-                    string lParameterTypeId = lNode.Attributes.GetNamedItem("ParameterType").Value;
+                    string lParameterTypeId = lNode.NodeAttr("ParameterType");
                     XmlNode lParameterType = iParameterTypesNode.SelectSingleNode(string.Format("//ParameterType[@Id='{0}']", lParameterTypeId));
                     XmlNode lTypeNumber = null;
                     if (lParameterType != null) lTypeNumber = lParameterType.FirstChild;
