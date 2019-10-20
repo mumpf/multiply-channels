@@ -294,7 +294,7 @@ namespace MultiplyChannels {
                         if (lSizeInBitAttribute != null) {
                             lResult = (int.Parse(lSizeInBitAttribute.Value) - 1) / 8 + 1;
                         } else if (lParameterType.SelectSingleNode("TypeFloat") != null) {
-                            lResult = 4;
+                            lResult = 2;
                         }
                     }
                 }
@@ -496,6 +496,7 @@ namespace MultiplyChannels {
                 string lHeaderFileName = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("header");
                 string lHeaderPrefixName = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("prefix");
                 ProcessInclude lInclude = ProcessInclude.Factory(lIncludeName, lHeaderFileName, lHeaderPrefixName);
+                lHeaderPrefixName = lInclude.mHeaderPrefixName;
                 string lTargetPath = Path.Combine(iCurrentDir, lIncludeName);
                 lInclude.LoadAdvanced(lTargetPath);
                 //...find include in real document...

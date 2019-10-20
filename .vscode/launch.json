@@ -12,7 +12,8 @@
             "program": "${workspaceFolder}/bin/Debug/netcoreapp3.0/MultiplyChannels.dll",
             "args": [
                 "create",
-                "${env:USERPROFILE}/Documents/PlatformIO/Projects/knx/examples/knx-sonoffS20/knx-sonoffS20"
+                "--Debug",
+                "${env:USERPROFILE}/Documents/PlatformIO/Projects/knx-logic/src/Logikmodul"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -33,6 +34,7 @@
                 "--ProductName=ProductName",
                 "--HardwareName=HardwareName",
                 "--HardwareVersion=12",
+                "--Debug",
                 "Check.xml"
             ],
             "cwd": "${workspaceFolder}",

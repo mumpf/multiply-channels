@@ -4,6 +4,7 @@ using System.Xml;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using CommandLine;
 using System.Linq;
 // using Knx.Ets.Xml.ObjectModel;
@@ -173,6 +174,32 @@ namespace MultiplyChannels {
             }
             if (!lFailPart) Console.WriteLine(" finished");
             lFail = lFail || lFailPart;
+
+            Console.Write("- Id-Namespace...");
+            // find refid
+            lFailPart = false;
+            XmlNode lApplicationProgramNode = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/ApplicationPrograms/ApplicationProgram");
+            string lApplicationId = lApplicationProgramNode.Attributes.GetNamedItem("Id").Value;
+            string lRefNs = lApplicationId.Replace("M-00FA_A", "");
+            // check all nodes according to refid
+            lNodes = iTargetNode.SelectNodes("//*/@*[string-length() > '13']");
+            foreach (XmlNode lNode in lNodes) {
+                if (lNode.Value != null) {
+                    var lMatch = Regex.Match(lNode.Value, "-[0-9A-F]{4}-[0-9A-F]{2}-[0-9A-F]{4}");
+                    if (lMatch.Success) {
+                        if (lMatch.Value != lRefNs) {
+                            if (!lFailPart) Console.WriteLine();
+                            XmlElement lElement = ((XmlAttribute)lNode).OwnerElement;
+                            Console.WriteLine("  {0} of node {2} {3} is in a different namespace than application namespace {1}", lMatch.Value, lRefNs, lElement.Name, lElement.NodeAttr("Name"));
+                            lFailPart = true;
+                        }
+                    }
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" finished");
+            lFail = lFail || lFailPart;
+
+
 
             lFailPart = false;
             Console.Write("- Serial number...");
