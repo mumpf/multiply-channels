@@ -187,7 +187,7 @@ namespace MultiplyChannels {
             if (iTargetNode.Name == "Parameter") {
                 ProcessParameter(iChannel, iTargetNode, iInclude);
             } else
-            if (iTargetNode.Name == "Channel") {
+            if (iTargetNode.Name == "Channel" || iTargetNode.Name == "ParameterBlock") {
                 ProcessChannel(iChannel, iTargetNode, iInclude);
             }
         }

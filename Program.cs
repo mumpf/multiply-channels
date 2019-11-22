@@ -143,6 +143,18 @@ namespace MultiplyChannels {
             lFail = lFail || lFailPart;
 
             lFailPart = false;
+            Console.Write("- TextParameterRefId-Integrity...");
+            lNodes = iTargetNode.SelectNodes("//*[@TextParameterRefId]");
+            foreach (XmlNode lNode in lNodes) {
+                string lTextParamRefId = lNode.Attributes.GetNamedItem("TextParameterRefId").Value;
+                if (!lIds.ContainsKey(lTextParamRefId)) {
+                    WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lTextParamRefId, lNode.Name, lNode.NodeAttr("Name"));
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
+            lFailPart = false;
             Console.Write("- ParameterType-Integrity...");
             lNodes = iTargetNode.SelectNodes("//*[@ParameterType]");
             foreach (XmlNode lNode in lNodes) {
