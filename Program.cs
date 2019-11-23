@@ -186,7 +186,8 @@ namespace MultiplyChannels {
             lNodes = iTargetNode.SelectNodes("//Parameter");
             foreach (XmlNode lNode in lNodes) {
                 // we add the node to parameter cache
-                gParameters.Add(lNode.NodeAttr("Id"), lNode);
+                string lNodeId = lNode.NodeAttr("Id");
+                if (!gParameters.ContainsKey(lNodeId)) gParameters.Add(lNodeId, lNode);
                 string lMessage = string.Format("Parameter {0}", lNode.NodeAttr("Name"));
                 string lParameterValue = lNode.NodeAttr("Value", null);
                 if (lParameterValue == null) {
