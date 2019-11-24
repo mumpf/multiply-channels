@@ -226,6 +226,21 @@ namespace MultiplyChannels {
             if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
+            Console.Write("- ComObject-Number-Uniqueness...");
+            lFailPart = false;
+            lNodes = iTargetNode.SelectNodes("//ComObject[@Number]");
+            Dictionary<int, bool> lKoNumbers = new Dictionary<int, bool>();
+            foreach (XmlNode lNode in lNodes) {
+                int lNumber = int.Parse(lNode.Attributes.GetNamedItem("Number").Value);
+                if (lKoNumbers.ContainsKey(lNumber)) {
+                    WriteFail(ref lFailPart, "{0} is a duplicate Number in ComObject with name {1}", lNumber, lNode.NodeAttr("Name"));
+                } else {
+                    lKoNumbers.Add(lNumber, true);
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
             Console.Write("- Id-Namespace...");
             // find refid
             lFailPart = false;
