@@ -34,7 +34,7 @@
             "group": "build",
             "type": "shell",
             "args": [
-                "${workspaceFolder}\\bin\\Debug\\netcoreapp3.0\\win-x64\\publish\\MultiplyChannels.exe",
+                "${workspaceFolder}\\bin\\Debug\\netcoreapp3.1\\win-x64\\publish\\MultiplyChannels.exe",
                 "${env:USERPROFILE}\\bin"
             ],
             "problemMatcher": "$tsc"
