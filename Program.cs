@@ -155,6 +155,30 @@ namespace MultiplyChannels {
             lFail = lFail || lFailPart;
 
             lFailPart = false;
+            Console.Write("- SourceParamRefRef-Integrity...");
+            lNodes = iTargetNode.SelectNodes("//*[@SourceParamRefRef]");
+            foreach (XmlNode lNode in lNodes) {
+                string lSourceParamRefRef = lNode.Attributes.GetNamedItem("SourceParamRefRef").Value;
+                if (!lIds.ContainsKey(lSourceParamRefRef)) {
+                    WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lSourceParamRefRef, lNode.Name, lNode.NodeAttr("Name"));
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
+            lFailPart = false;
+            Console.Write("- TargetParamRefRef-Integrity...");
+            lNodes = iTargetNode.SelectNodes("//*[@TargetParamRefRef]");
+            foreach (XmlNode lNode in lNodes) {
+                string lTargetParamRefRef = lNode.Attributes.GetNamedItem("TargetParamRefRef").Value;
+                if (!lIds.ContainsKey(lTargetParamRefRef)) {
+                    WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lTargetParamRefRef, lNode.Name, lNode.NodeAttr("Name"));
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
+            lFailPart = false;
             Console.Write("- ParameterType-Integrity...");
             lNodes = iTargetNode.SelectNodes("//*[@ParameterType]");
             foreach (XmlNode lNode in lNodes) {

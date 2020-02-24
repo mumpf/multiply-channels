@@ -168,6 +168,16 @@ namespace MultiplyChannels {
             }
         }
 
+        void ProcessUnion(int iChannel, XmlNode iTargetNode, ProcessInclude iInclude) {
+            //calculate new offset
+            ProcessParameter(iChannel, iTargetNode, iInclude);
+            XmlNodeList lChildren = iTargetNode.ChildNodes;
+            foreach (XmlNode lChild in lChildren) {
+                if (lChild.Name=="Parameter")
+                    ProcessAttributes(iChannel, lChild, iInclude);
+            }
+        }
+
         void ProcessChannel(int iChannel, XmlNode iTargetNode, ProcessInclude iInclude) {
             //attributes of the node
             if (iTargetNode.Attributes != null) {
@@ -186,6 +196,9 @@ namespace MultiplyChannels {
             ProcessAttributes(iChannel, iTargetNode, iInclude);
             if (iTargetNode.Name == "Parameter") {
                 ProcessParameter(iChannel, iTargetNode, iInclude);
+            } else
+            if (iTargetNode.Name == "Union") {
+                ProcessUnion(iChannel, iTargetNode, iInclude);
             } else
             if (iTargetNode.Name == "Channel" || iTargetNode.Name == "ParameterBlock") {
                 ProcessChannel(iChannel, iTargetNode, iInclude);
@@ -295,6 +308,8 @@ namespace MultiplyChannels {
                             lResult = (int.Parse(lSizeInBitAttribute.Value) - 1) / 8 + 1;
                         } else if (lParameterType.SelectSingleNode("TypeFloat") != null) {
                             lResult = 2;
+                        } else if (lParameterType.SelectSingleNode("TypeColor") != null) {
+                            lResult = 3;
                         }
                     }
                 }
@@ -393,9 +408,14 @@ namespace MultiplyChannels {
             int lMaxSize = 0;
             XmlNodeList lNodes = mDocument.SelectNodes("//Parameter");
             foreach (XmlNode lNode in lNodes) {
+                XmlNode lMemoryNode;
                 string lName = lNode.Attributes.GetNamedItem("Name").Value;
                 lName = ReplaceChannelName(lName);
-                XmlNode lMemory = lNode.FirstChild;
+                lMemoryNode = lNode.ParentNode;
+                if (lMemoryNode != null && lMemoryNode.Name!="Union") {
+                    lMemoryNode = lNode;
+                }
+                XmlNode lMemory = lMemoryNode.FirstChild;
                 while (lMemory != null && lMemory.NodeType == XmlNodeType.Comment) lMemory = lMemory.NextSibling;
                 if (lMemory != null && iParameterTypesNode != null) {
                     // parse parameter type to fill additional information
@@ -424,6 +444,11 @@ namespace MultiplyChannels {
                         if (lTypeNumber.Name == "TypeFloat") {
                             lType = "float";
                             lBits = 16;
+                            lDirectType = true;
+                        }
+                        if (lTypeNumber.Name == "TypeColor") {
+                            lType = "color, uint, 3 Byte";
+                            lBits = 24;
                             lDirectType = true;
                         }
                     }
@@ -505,7 +530,7 @@ namespace MultiplyChannels {
                 XmlNodeList lChildren = lInclude.SelectNodes(lXPath);
                 if (lHeaderFileName != "") {
                     lHeaderFileName = Path.Combine(iCurrentDir, lHeaderFileName);
-                    if (lChildren.Count > 0 && "Parameter | ComObject".Contains(lChildren[0].LocalName)) {
+                    if (lChildren.Count > 0 && "Parameter | Union | ComObject".Contains(lChildren[0].LocalName)) {
                         // at this point we are including a template file
                         ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
                     }

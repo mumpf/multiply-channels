@@ -9,11 +9,11 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/netcoreapp3.0/MultiplyChannels.dll",
+            "program": "${workspaceFolder}/bin/Debug/netcoreapp3.1/MultiplyChannels.dll",
             "args": [
                 "create",
                 "--Debug",
-                "${env:USERPROFILE}/Documents/PlatformIO/Projects/knx-logic/src/Logikmodul"
+                "${env:USERPROFILE}/Documents/PlatformIO/Projects/knx-sensor/src/Sensormodul"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -24,7 +24,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/netcoreapp3.0/MultiplyChannels.dll",
+            "program": "${workspaceFolder}/bin/Debug/netcoreapp3.1/MultiplyChannels.dll",
             "args": [
                 "new",
                 "--AppName=AppName",
