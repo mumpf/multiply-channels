@@ -164,6 +164,10 @@ namespace MultiplyChannels {
                 string lTextParamRefId = lNode.Attributes.GetNamedItem("TextParameterRefId").Value;
                 if (!lIds.ContainsKey(lTextParamRefId)) {
                     WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lTextParamRefId, lNode.Name, lNode.NodeAttr("Name"));
+                } else {
+                    string lId = lTextParamRefId.Substring(0, lTextParamRefId.LastIndexOf("_R"));
+                    XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0} {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
+                    lNode.ParentNode.InsertBefore(lComment, lNode);
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
@@ -176,6 +180,10 @@ namespace MultiplyChannels {
                 string lSourceParamRefRef = lNode.Attributes.GetNamedItem("SourceParamRefRef").Value;
                 if (!lIds.ContainsKey(lSourceParamRefRef)) {
                     WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lSourceParamRefRef, lNode.Name, lNode.NodeAttr("Name"));
+                } else {
+                    string lId = lSourceParamRefRef.Substring(0, lSourceParamRefRef.LastIndexOf("_R"));
+                    XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0}-Source {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
+                    lNode.ParentNode.InsertBefore(lComment, lNode);
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
@@ -188,6 +196,10 @@ namespace MultiplyChannels {
                 string lTargetParamRefRef = lNode.Attributes.GetNamedItem("TargetParamRefRef").Value;
                 if (!lIds.ContainsKey(lTargetParamRefRef)) {
                     WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lTargetParamRefRef, lNode.Name, lNode.NodeAttr("Name"));
+                } else {
+                    string lId = lTargetParamRefRef.Substring(0, lTargetParamRefRef.LastIndexOf("_R"));
+                    XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0}-Target {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
+                    lNode.ParentNode.InsertBefore(lComment, lNode);
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
