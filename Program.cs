@@ -93,7 +93,14 @@ namespace MultiplyChannels {
             return lResult;
         }
 
-        static bool ProcessSanityChecks(XmlNode iTargetNode) {
+        static XmlNode GetParameterByRefId(XmlNode iRootNode, string iRefId) {
+            XmlNode lResult = null;
+            string lId = iRefId.Substring(0, iRefId.LastIndexOf("_R"));
+            lResult = GetParameterById(iRootNode, lId);
+            return lResult;
+        }
+
+        static bool ProcessSanityChecks(XmlDocument iTargetNode) {
 
             Console.WriteLine();
             Console.WriteLine("Sanity checks... ");
@@ -102,13 +109,13 @@ namespace MultiplyChannels {
             Console.Write("- Id-Uniqueness...");
             bool lFailPart = false;
             XmlNodeList lNodes = iTargetNode.SelectNodes("//*[@Id]");
-            Dictionary<string, bool> lIds = new Dictionary<string, bool>();
+            Dictionary<string, XmlNode> lIds = new Dictionary<string, XmlNode>();
             foreach (XmlNode lNode in lNodes) {
                 string lId = lNode.Attributes.GetNamedItem("Id").Value;
                 if (lIds.ContainsKey(lId)) {
                     WriteFail(ref lFailPart, "{0} is a duplicate Id in {1}", lId, lNode.NodeAttr("Name"));
                 } else {
-                    lIds.Add(lId, true);
+                    lIds.Add(lId, lNode);
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
@@ -122,6 +129,10 @@ namespace MultiplyChannels {
                     string lRefId = lNode.Attributes.GetNamedItem("RefId").Value;
                     if (!lIds.ContainsKey(lRefId)) {
                         WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lRefId, lNode.Name, lNode.NodeAttr("Name"));
+                    } else if (lRefId.Contains("_R")) {
+                        string lId = lRefId.Substring(0, lRefId.LastIndexOf("_R"));
+                        XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0} {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
+                        lNode.ParentNode.InsertBefore(lComment, lNode);
                     }
                 }
             }
@@ -136,6 +147,10 @@ namespace MultiplyChannels {
                     string lParamRefId = lNode.Attributes.GetNamedItem("ParamRefId").Value;
                     if (!lIds.ContainsKey(lParamRefId)) {
                         WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lParamRefId, lNode.Name, lNode.NodeAttr("Name"));
+                    } else {
+                        string lId = lParamRefId.Substring(0, lParamRefId.LastIndexOf("_R"));
+                        XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0} {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
+                        lNode.ParentNode.InsertBefore(lComment, lNode);
                     }
                 }
             }
