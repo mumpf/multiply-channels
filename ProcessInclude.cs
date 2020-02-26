@@ -297,18 +297,25 @@ namespace MultiplyChannels {
         public int CalcParamSize(XmlNode iParameter, XmlNode iParameterTypesNode) {
             int lResult = 0;
             if (iParameterTypesNode != null) {
+                // we calcucalte the size only, if the parameter uses some memory in the device storage
                 XmlNode lMemory = iParameter.SelectSingleNode("Memory");
                 if (lMemory != null) {
-                    // we calcucalte the size only, if the parameter uses some memory in the device storage
-                    string lParameterTypeId = iParameter.NodeAttr("ParameterType");
-                    XmlNode lParameterType = iParameterTypesNode.SelectSingleNode(string.Format("ParameterType[@Id='{0}']", lParameterTypeId));
-                    if (lParameterType != null) {
-                        XmlNode lSizeInBitAttribute = lParameterType.SelectSingleNode("*/@SizeInBit");
+                    XmlNode lSizeNode = null;
+                    XmlNode lSizeInBitAttribute = null;
+                    if (iParameter.Name == "Union") {
+                        lSizeNode = iParameter;
+                        lSizeInBitAttribute = lSizeNode.Attributes.GetNamedItem("SizeInBit");
+                    } else {
+                        string lParameterTypeId = iParameter.NodeAttr("ParameterType");
+                        lSizeNode = iParameterTypesNode.SelectSingleNode(string.Format("ParameterType[@Id='{0}']", lParameterTypeId));
+                        lSizeInBitAttribute = lSizeNode.SelectSingleNode("*/@SizeInBit");
+                    }
+                    if (lSizeNode != null) {
                         if (lSizeInBitAttribute != null) {
                             lResult = (int.Parse(lSizeInBitAttribute.Value) - 1) / 8 + 1;
-                        } else if (lParameterType.SelectSingleNode("TypeFloat") != null) {
+                        } else if (lSizeNode.SelectSingleNode("TypeFloat") != null) {
                             lResult = 2;
-                        } else if (lParameterType.SelectSingleNode("TypeColor") != null) {
+                        } else if (lSizeNode.SelectSingleNode("TypeColor") != null) {
                             lResult = 3;
                         }
                     }
@@ -454,6 +461,11 @@ namespace MultiplyChannels {
                     }
                     int lOffset = int.Parse(lMemory.Attributes.GetNamedItem("Offset").Value);
                     int lBitOffset = int.Parse(lMemory.Attributes.GetNamedItem("BitOffset").Value);
+                    // Offset and BitOffset might be also defined in Parameter
+                    XmlNode lParamOffsetNode = lNode.Attributes.GetNamedItem("Offset");
+                    if (lParamOffsetNode != null) lOffset += int.Parse(lParamOffsetNode.Value);
+                    XmlNode lParamBitOffsetNode = lNode.Attributes.GetNamedItem("BitOffset");
+                    if (lParamBitOffsetNode != null) lBitOffset += int.Parse(lParamBitOffsetNode.Value);
                     lMaxSize = Math.Max(lMaxSize, lOffset + (lBits - 1) / 8 + 1);
                     if (lBits <= 7 || lType == "enum") {
                         //output for bit based parameters 
@@ -566,7 +578,7 @@ namespace MultiplyChannels {
             if (mParameterTypesNode != null) {
                 // the main document contains necessary ParameterTypes definitions
                 // there are new parameters in include, we have to calculate a new parameter offset
-                XmlNodeList lParameterNodes = mDocument.SelectNodes("//Parameters/Parameter");
+                XmlNodeList lParameterNodes = mDocument.SelectNodes("//Parameters/Parameter|//Parameters/Union");
                 if (lParameterNodes != null) {
                     mParameterBlockSize = CalcParamSize(lParameterNodes, mParameterTypesNode);
                 }
