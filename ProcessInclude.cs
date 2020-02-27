@@ -308,7 +308,7 @@ namespace MultiplyChannels {
                     } else {
                         string lParameterTypeId = iParameter.NodeAttr("ParameterType");
                         lSizeNode = iParameterTypesNode.SelectSingleNode(string.Format("ParameterType[@Id='{0}']", lParameterTypeId));
-                        lSizeInBitAttribute = lSizeNode.SelectSingleNode("*/@SizeInBit");
+                        if (lSizeNode != null) lSizeInBitAttribute = lSizeNode.SelectSingleNode("*/@SizeInBit");
                     }
                     if (lSizeNode != null) {
                         if (lSizeInBitAttribute != null) {
