@@ -79,25 +79,26 @@ namespace MultiplyChannels {
             iFail = true;
         }
 
-        // Parameter cache
-        static Dictionary<string, XmlNode> gParameters = new Dictionary<string, XmlNode>();
+        // Node cache
+        static Dictionary<string, XmlNode> gIds = new Dictionary<string, XmlNode>();
 
-        static XmlNode GetParameterById(XmlNode iRootNode, string iId) {
+        static XmlNode GetNodeById(XmlNode iRootNode, string iId) {
             XmlNode lResult = null;
-            if (gParameters.ContainsKey(iId)) {
-                lResult = gParameters[iId];
+            if (gIds.ContainsKey(iId)) {
+                lResult = gIds[iId];
             } else {
-                lResult = iRootNode.SelectSingleNode(string.Format("//Parameter[@Id='{0}']", iId));
-                if (lResult != null) gParameters.Add(iId, lResult);
+                lResult = iRootNode.SelectSingleNode(string.Format("//*[@Id='{0}']", iId));
+                if (lResult != null) gIds.Add(iId, lResult);
             }
             return lResult;
         }
 
-        static XmlNode GetParameterByRefId(XmlNode iRootNode, string iRefId) {
-            XmlNode lResult = null;
-            string lId = iRefId.Substring(0, iRefId.LastIndexOf("_R"));
-            lResult = GetParameterById(iRootNode, lId);
-            return lResult;
+        private static void CreateComment(XmlDocument iTargetNode, XmlNode iNode, string iId, string iSuffix = "") {
+            string lNodeId = iId.Substring(0, iId.LastIndexOf("_R"));
+            string lTextId = iId;
+            if (gIds[lTextId].NodeAttr("Text") == "") lTextId = lNodeId;
+            XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0}{3} {1} '{2}'", iNode.Name, gIds[lNodeId].NodeAttr("Name"), gIds[lTextId].NodeAttr("Text"), iSuffix));
+            iNode.ParentNode.InsertBefore(lComment, iNode);
         }
 
         static bool ProcessSanityChecks(XmlDocument iTargetNode) {
@@ -109,13 +110,12 @@ namespace MultiplyChannels {
             Console.Write("- Id-Uniqueness...");
             bool lFailPart = false;
             XmlNodeList lNodes = iTargetNode.SelectNodes("//*[@Id]");
-            Dictionary<string, XmlNode> lIds = new Dictionary<string, XmlNode>();
             foreach (XmlNode lNode in lNodes) {
                 string lId = lNode.Attributes.GetNamedItem("Id").Value;
-                if (lIds.ContainsKey(lId)) {
+                if (gIds.ContainsKey(lId)) {
                     WriteFail(ref lFailPart, "{0} is a duplicate Id in {1}", lId, lNode.NodeAttr("Name"));
                 } else {
-                    lIds.Add(lId, lNode);
+                    gIds.Add(lId, lNode);
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
@@ -127,12 +127,10 @@ namespace MultiplyChannels {
             foreach (XmlNode lNode in lNodes) {
                 if (lNode.Name != "Manufacturer") {
                     string lRefId = lNode.Attributes.GetNamedItem("RefId").Value;
-                    if (!lIds.ContainsKey(lRefId)) {
+                    if (!gIds.ContainsKey(lRefId)) {
                         WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lRefId, lNode.Name, lNode.NodeAttr("Name"));
                     } else if (lRefId.Contains("_R")) {
-                        string lId = lRefId.Substring(0, lRefId.LastIndexOf("_R"));
-                        XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0} {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
-                        lNode.ParentNode.InsertBefore(lComment, lNode);
+                        CreateComment(iTargetNode, lNode, lRefId);
                     }
                 }
             }
@@ -145,12 +143,10 @@ namespace MultiplyChannels {
             foreach (XmlNode lNode in lNodes) {
                 if (lNode.Name != "Manufacturer") {
                     string lParamRefId = lNode.Attributes.GetNamedItem("ParamRefId").Value;
-                    if (!lIds.ContainsKey(lParamRefId)) {
+                    if (!gIds.ContainsKey(lParamRefId)) {
                         WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lParamRefId, lNode.Name, lNode.NodeAttr("Name"));
                     } else {
-                        string lId = lParamRefId.Substring(0, lParamRefId.LastIndexOf("_R"));
-                        XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0} {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
-                        lNode.ParentNode.InsertBefore(lComment, lNode);
+                        CreateComment(iTargetNode, lNode, lParamRefId);
                     }
                 }
             }
@@ -162,12 +158,10 @@ namespace MultiplyChannels {
             lNodes = iTargetNode.SelectNodes("//*[@TextParameterRefId]");
             foreach (XmlNode lNode in lNodes) {
                 string lTextParamRefId = lNode.Attributes.GetNamedItem("TextParameterRefId").Value;
-                if (!lIds.ContainsKey(lTextParamRefId)) {
+                if (!gIds.ContainsKey(lTextParamRefId)) {
                     WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lTextParamRefId, lNode.Name, lNode.NodeAttr("Name"));
                 } else {
-                    string lId = lTextParamRefId.Substring(0, lTextParamRefId.LastIndexOf("_R"));
-                    XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0} {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
-                    lNode.ParentNode.InsertBefore(lComment, lNode);
+                    CreateComment(iTargetNode, lNode, lTextParamRefId);
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
@@ -178,12 +172,10 @@ namespace MultiplyChannels {
             lNodes = iTargetNode.SelectNodes("//*[@SourceParamRefRef]");
             foreach (XmlNode lNode in lNodes) {
                 string lSourceParamRefRef = lNode.Attributes.GetNamedItem("SourceParamRefRef").Value;
-                if (!lIds.ContainsKey(lSourceParamRefRef)) {
+                if (!gIds.ContainsKey(lSourceParamRefRef)) {
                     WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lSourceParamRefRef, lNode.Name, lNode.NodeAttr("Name"));
                 } else {
-                    string lId = lSourceParamRefRef.Substring(0, lSourceParamRefRef.LastIndexOf("_R"));
-                    XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0}-Source {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
-                    lNode.ParentNode.InsertBefore(lComment, lNode);
+                    CreateComment(iTargetNode, lNode, lSourceParamRefRef, "-Source");
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
@@ -194,12 +186,10 @@ namespace MultiplyChannels {
             lNodes = iTargetNode.SelectNodes("//*[@TargetParamRefRef]");
             foreach (XmlNode lNode in lNodes) {
                 string lTargetParamRefRef = lNode.Attributes.GetNamedItem("TargetParamRefRef").Value;
-                if (!lIds.ContainsKey(lTargetParamRefRef)) {
+                if (!gIds.ContainsKey(lTargetParamRefRef)) {
                     WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lTargetParamRefRef, lNode.Name, lNode.NodeAttr("Name"));
                 } else {
-                    string lId = lTargetParamRefRef.Substring(0, lTargetParamRefRef.LastIndexOf("_R"));
-                    XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0}-Target {1} '{2}'", lNode.Name, lIds[lId].NodeAttr("Name"), lIds[lId].NodeAttr("Text")));
-                    lNode.ParentNode.InsertBefore(lComment, lNode);
+                    CreateComment(iTargetNode, lNode, lTargetParamRefRef, "-Target");
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
@@ -210,7 +200,7 @@ namespace MultiplyChannels {
             lNodes = iTargetNode.SelectNodes("//*[@ParameterType]");
             foreach (XmlNode lNode in lNodes) {
                 string lParameterType = lNode.Attributes.GetNamedItem("ParameterType").Value;
-                if (!lIds.ContainsKey(lParameterType)) {
+                if (!gIds.ContainsKey(lParameterType)) {
                     WriteFail(ref lFailPart, "{0} is referenced in {1} {2}, but not defined", lParameterType, lNode.Name, lNode.NodeAttr("Name"));
                 }
             }
@@ -238,7 +228,6 @@ namespace MultiplyChannels {
             foreach (XmlNode lNode in lNodes) {
                 // we add the node to parameter cache
                 string lNodeId = lNode.NodeAttr("Id");
-                if (!gParameters.ContainsKey(lNodeId)) gParameters.Add(lNodeId, lNode);
                 string lMessage = string.Format("Parameter {0}", lNode.NodeAttr("Name"));
                 string lParameterValue = lNode.NodeAttr("Value", null);
                 if (lParameterValue == null) {
@@ -255,7 +244,7 @@ namespace MultiplyChannels {
             foreach (XmlNode lNode in lNodes) {
                 string lParameterRefValue = lNode.NodeAttr("Value");
                 // find parameter
-                XmlNode lParameterNode = GetParameterById(iTargetNode, lNode.NodeAttr("RefId"));
+                XmlNode lParameterNode = GetNodeById(iTargetNode, lNode.NodeAttr("RefId"));
                 string lMessage = string.Format("ParameterRef {0}, referencing Parameter {1},", lNode.NodeAttr("Id"), lParameterNode.NodeAttr("Name"));
                 lFailPart = CheckParameterValueIntegrity(iTargetNode, lFailPart, lParameterNode, lParameterRefValue, lMessage);
             }
