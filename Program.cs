@@ -96,8 +96,12 @@ namespace MultiplyChannels {
         private static void CreateComment(XmlDocument iTargetNode, XmlNode iNode, string iId, string iSuffix = "") {
             string lNodeId = iId.Substring(0, iId.LastIndexOf("_R"));
             string lTextId = iId;
-            if (gIds[lTextId].NodeAttr("Text") == "") lTextId = lNodeId;
-            XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0}{3} {1} '{2}'", iNode.Name, gIds[lNodeId].NodeAttr("Name"), gIds[lTextId].NodeAttr("Text"), iSuffix));
+            string lNodeName = "Id-mismatch! Nema not found!";
+            string lText = "Id-mismatch! Text not found!";
+            if (gIds.ContainsKey(lNodeId)) lNodeName = gIds[lNodeId].NodeAttr("Name");
+            if (gIds.ContainsKey(lTextId) && gIds[lTextId].NodeAttr("Text") == "") lTextId = lNodeId;
+            if (gIds.ContainsKey(lTextId)) lText = gIds[lTextId].NodeAttr("Text");
+            XmlComment lComment = iTargetNode.CreateComment(string.Format(" {0}{3} {1} '{2}'", iNode.Name, lNodeName, lText, iSuffix));
             iNode.ParentNode.InsertBefore(lComment, iNode);
         }
 
@@ -207,6 +211,18 @@ namespace MultiplyChannels {
             if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
+            lFailPart = false;
+            Console.Write("- Union-Integrity...");
+            lNodes = iTargetNode.SelectNodes("//Union");
+            foreach (XmlNode lNode in lNodes) {
+                string lSize = lNode.NodeAttr("SizeInBit");
+                if (lSize == "") {
+                    WriteFail(ref lFailPart, "Union without SizeInBit-Attribute found");
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
             Console.Write("- Parameter-Name-Uniqueness...");
             lFailPart = false;
             lNodes = iTargetNode.SelectNodes("//Parameter[@Name]");
@@ -239,14 +255,22 @@ namespace MultiplyChannels {
             lFail = lFail || lFailPart;
 
             lFailPart = false;
+            bool lSkipTest = false;
             Console.Write("- ParameterRef-Value-Integrity...");
             lNodes = iTargetNode.SelectNodes("//ParameterRef[@Value]");
             foreach (XmlNode lNode in lNodes) {
                 string lParameterRefValue = lNode.NodeAttr("Value");
                 // find parameter
                 XmlNode lParameterNode = GetNodeById(iTargetNode, lNode.NodeAttr("RefId"));
+                if (lParameterNode == null) {
+                    lSkipTest = true;
+                    break;
+                }
                 string lMessage = string.Format("ParameterRef {0}, referencing Parameter {1},", lNode.NodeAttr("Id"), lParameterNode.NodeAttr("Name"));
                 lFailPart = CheckParameterValueIntegrity(iTargetNode, lFailPart, lParameterNode, lParameterRefValue, lMessage);
+            }
+            if (lSkipTest) {
+                WriteFail(ref lFailPart, "Test not possible due to Errors in ParameterRef definitions (sove above problems first)");
             }
             if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
@@ -298,6 +322,63 @@ namespace MultiplyChannels {
                             WriteFail(ref lFailPart, "{0} of node {2} {3} is in a different namespace than application namespace {1}", lMatch.Value, lRefNs, lElement.Name, lElement.NodeAttr("Name"));
                         }
                     }
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
+            Console.Write("- Id-Format...");
+            // An id has to fulfill a specific format
+            lFailPart = false;
+            string lIdPart = "";
+            foreach (var lKeyValuePair in gIds) {
+                string lId = lKeyValuePair.Key;
+                lId = lId.Replace(lApplicationId, "");
+                XmlNode lElement = lKeyValuePair.Value;
+                switch (lElement.Name)
+                {
+                    case "Parameter":
+                        if (lElement.ParentNode.Name == "Union") {
+                            lIdPart = "_UP-";
+                        } else {
+                            lIdPart = "_P-";
+                        }
+                        break;
+                    case "ComObject":
+                        lIdPart = "_O-";
+                        break;
+                    case "ParameterType":
+                    case "Enumeration":
+                        lIdPart = "_PT-";
+                        break;
+                    case "ParameterRef":
+                    case "ComObjectRef":
+                        lIdPart = "_R-";
+                        if (lId.Contains(lIdPart)) lIdPart = "";
+                        break;
+                    case "ParameterBlock":
+                        lIdPart = "_PB-";
+                        break;
+                    case "ParameterSeparator":
+                        lIdPart = "_PS-";
+                        break;
+                    case "Channel":
+                        lIdPart = "_CH-";
+                        break;
+                    case "Row":
+                        lIdPart = "_R-";
+                        if (lId.Contains(lIdPart)) lIdPart = "_PB-";
+                        break;
+                    case "Column":
+                        lIdPart = "_C-";
+                        if (lId.Contains(lIdPart)) lIdPart = "_PB-";
+                        break;
+                    default:
+                        lIdPart = "";
+                        break;
+                }
+                if (lIdPart != "" && !lId.StartsWith(lIdPart)) {
+                    WriteFail(ref lFailPart, "{0} {1} has the Id={2}, but this Id is missing the required part {3}", lElement.Name, lElement.NodeAttr("Name"), lKeyValuePair.Key, lIdPart);
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
