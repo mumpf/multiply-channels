@@ -88,10 +88,10 @@ namespace MultiplyChannels {
                 StreamReader lHeaderFile = File.OpenText(iHeaderFileName);
                 string lHeaderFileContent = lHeaderFile.ReadToEnd();
                 lHeaderFile.Close();
-                mChannelCount = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "Channels");
+                // mChannelCount = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "Channels");
                 mKoOffset = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "KoOffset");
             } else {
-                mChannelCount = 1;
+                // mChannelCount = 1;
                 mKoOffset = 1;
             }
             // mKoBlockSize = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "KoBlockSize");
@@ -397,9 +397,9 @@ namespace MultiplyChannels {
 
         public void ExportHeaderParameterBlock(StringBuilder cOut, XmlNode iParameterTypesNode, string iHeaderPrefixName) {
             if (!mHeaderParameterBlockGenerated) {
-                cOut.AppendFormat("#define {0}Channels {1}", iHeaderPrefixName, mChannelCount);
-                cOut.AppendLine();
-                cOut.AppendLine();
+                // cOut.AppendFormat("#define {0}Channels {1}", iHeaderPrefixName, mChannelCount);
+                // cOut.AppendLine();
+                // cOut.AppendLine();
                 cOut.AppendLine("// Parameter per channel");
                 cOut.AppendFormat("#define {0}ParamBlockOffset {1}", iHeaderPrefixName, mParameterBlockOffset);
                 cOut.AppendLine();
@@ -544,6 +544,13 @@ namespace MultiplyChannels {
                     lHeaderFileName = Path.Combine(iCurrentDir, lHeaderFileName);
                     if (lChildren.Count > 0 && "Parameter | Union | ComObject".Contains(lChildren[0].LocalName)) {
                         // at this point we are including a template file
+                        // process NumChannels node
+                        XmlNode lDefineNode = mDocument.SelectSingleNode("//mc:define", nsmgr);
+                        if (lDefineNode != null) {
+                            lInclude.ChannelCount = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("NumChannels"));
+                        } else {
+                            lInclude.ChannelCount = 1;
+                        }
                         ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
                     }
                 }
