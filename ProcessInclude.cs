@@ -83,20 +83,20 @@ namespace MultiplyChannels {
             return lResult;
         }
 
-        bool ParseHeaderFile(string iHeaderFileName) {
-            if (File.Exists(iHeaderFileName)) {
-                StreamReader lHeaderFile = File.OpenText(iHeaderFileName);
-                string lHeaderFileContent = lHeaderFile.ReadToEnd();
-                lHeaderFile.Close();
-                // mChannelCount = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "Channels");
-                mKoOffset = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "KoOffset");
-            } else {
-                // mChannelCount = 1;
-                mKoOffset = 1;
-            }
-            // mKoBlockSize = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "KoBlockSize");
-            return (mChannelCount >= 0) && (mKoOffset > 0);
-        }
+        // bool ParseHeaderFile(string iHeaderFileName) {
+        //     if (File.Exists(iHeaderFileName)) {
+        //         StreamReader lHeaderFile = File.OpenText(iHeaderFileName);
+        //         string lHeaderFileContent = lHeaderFile.ReadToEnd();
+        //         lHeaderFile.Close();
+        //         mChannelCount = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "Channels");
+        //         mKoOffset = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "KoOffset");
+        //     } else {
+        //         mChannelCount = 1;
+        //         mKoOffset = 1;
+        //     }
+        //     // mKoBlockSize = GetHeaderParameter(lHeaderFileContent, mHeaderPrefixName + "KoBlockSize");
+        //     return (mChannelCount >= 0) && (mKoOffset > 0);
+        // }
 
         public XmlNodeList SelectNodes(string iXPath) {
             return mDocument.SelectNodes(iXPath);
@@ -522,6 +522,16 @@ namespace MultiplyChannels {
             nsmgr = new XmlNamespaceManager(mDocument.NameTable);
             nsmgr.AddNamespace("mc", cOwnNamespace);
 
+            int lChannelCount = 1;
+            int lKoOffset = 1;
+
+            // process define node
+            XmlNode lDefineNode = mDocument.SelectSingleNode("//mc:define", nsmgr);
+            if (lDefineNode != null) {
+                lChannelCount = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("NumChannels"));
+                lKoOffset = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("KoOffset"));
+            }
+
             //find all XIncludes in a copy of the document
             XmlNodeList lIncludeNodes = mDocument.SelectNodes("//mc:include", nsmgr); // get all <include> nodes
 
@@ -544,13 +554,8 @@ namespace MultiplyChannels {
                     lHeaderFileName = Path.Combine(iCurrentDir, lHeaderFileName);
                     if (lChildren.Count > 0 && "Parameter | Union | ComObject".Contains(lChildren[0].LocalName)) {
                         // at this point we are including a template file
-                        // process NumChannels node
-                        XmlNode lDefineNode = mDocument.SelectSingleNode("//mc:define", nsmgr);
-                        if (lDefineNode != null) {
-                            lInclude.ChannelCount = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("NumChannels"));
-                        } else {
-                            lInclude.ChannelCount = 1;
-                        }
+                        lInclude.ChannelCount = lChannelCount;
+                        lInclude.KoOffset = lKoOffset;
                         ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
                     }
                 }
@@ -571,11 +576,12 @@ namespace MultiplyChannels {
                 // if (lHeaderPrefixName != "") ProcessIncludeFinish(lChildren);
                 //if this fails, something is wrong
             }
+            if (lDefineNode != null) lDefineNode.ParentNode.RemoveChild(lDefineNode);
             // catch { }
         }
 
         public void ExportHeader(string iHeaderFileName, string iHeaderPrefixName, ProcessInclude iInclude, XmlNodeList iChildren = null) {
-            iInclude.ParseHeaderFile(iHeaderFileName);
+            // iInclude.ParseHeaderFile(iHeaderFileName);
 
             if (mParameterTypesNode == null) {
                 // before we start with template processing, we calculate all Parameter relevant info
