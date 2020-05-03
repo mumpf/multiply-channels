@@ -125,6 +125,32 @@ namespace MultiplyChannels {
             if (!lFailPart) Console.WriteLine(" OK");
             lFail = lFail || lFailPart;
 
+            Console.Write("- Id-R_Suffix-Uniqueness...");
+            lFailPart = false;
+            Dictionary<string, bool> lParameterSuffixes = new Dictionary<string, bool>();
+            Dictionary<string, bool> lComObjectSuffixes = new Dictionary<string, bool>();
+            foreach (XmlNode lNode in lNodes) {
+                string lId = lNode.Attributes.GetNamedItem("Id").Value;
+                int lPos = lId.LastIndexOf("_R-");
+                Dictionary<string, bool> lSuffixes = null;
+                if (lPos > 0) {
+                    if (lId.Substring(0, lPos).Contains("_P-"))
+                        lSuffixes = lParameterSuffixes;
+                    else if (lId.Substring(0, lPos).Contains("_O-"))
+                        lSuffixes = lComObjectSuffixes;
+                    if (lSuffixes != null) {
+                        string lSuffix = lId.Substring(lPos + 3);
+                        if (lSuffixes.ContainsKey(lSuffix)) {
+                            WriteFail(ref lFailPart, "{0} is a duplicate _R-Suffix in {1}", lId, lNode.Name);
+                        } else {
+                            lSuffixes.Add(lSuffix, false);
+                        }
+                    }
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
             lFailPart = false;
             Console.Write("- RefId-Integrity...");
             lNodes = iTargetNode.SelectNodes("//*[@RefId]");

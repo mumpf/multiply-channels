@@ -9,6 +9,18 @@ namespace MultiplyChannels {
     public class ProcessInclude {
 
         const string cOwnNamespace = "http://github.com/mumpf/multiply-channels";
+        private struct sDefineContent
+        {
+            public string prefix;
+            public int KoOffset;
+            public int NumChannels;
+            public sDefineContent(string iPrefix, int iKoOffset, int iNumChannels) {
+                prefix = iPrefix;
+                KoOffset = iKoOffset;
+                NumChannels = iNumChannels;
+            }
+        }
+
         private XmlNamespaceManager nsmgr;
         private XmlDocument mDocument = new XmlDocument();
         private bool mLoaded = false;
@@ -16,6 +28,7 @@ namespace MultiplyChannels {
 
         private XmlNode mParameterTypesNode = null;
         private static Dictionary<string, ProcessInclude> gIncludes = new Dictionary<string, ProcessInclude>();
+        private Dictionary<string, sDefineContent> mDefines = new Dictionary<string, sDefineContent>();
         private string mXmlFileName;
         private string mHeaderFileName;
         private string mHeaderPrefixName;
@@ -200,7 +213,7 @@ namespace MultiplyChannels {
             if (iTargetNode.Name == "Union") {
                 ProcessUnion(iChannel, iTargetNode, iInclude);
             } else
-            if (iTargetNode.Name == "Channel" || iTargetNode.Name == "ParameterBlock") {
+            if (iTargetNode.Name == "Channel" || iTargetNode.Name == "ParameterBlock" || iTargetNode.Name == "choose") {
                 ProcessChannel(iChannel, iTargetNode, iInclude);
             }
         }
@@ -267,8 +280,7 @@ namespace MultiplyChannels {
                     }
                     // ParameterBlock is renumbered
                     if (lAttr.Value.Contains("_PB-")) {
-                        lAttr.Value = string.Format("{0}-{1}", lAttr.Value.Substring(0, lAttr.Value.LastIndexOf('-')), lParameterBlockCount);
-                        lParameterBlockCount += 1;
+                        lParameterBlockCount = RenumberParameterBlock(lParameterBlockCount, lAttr);
                     }
                 }
             }
@@ -292,6 +304,35 @@ namespace MultiplyChannels {
                 // if (!lReplacesVersions.Contains(lOldVerion) && lReplacesVersions != (lApplicationVersion - 1).ToString()) lReplacesVersionsAttribute.Value += lOldVerion;
             }
 
+        }
+
+        Dictionary<string, string> mParameterBlockMap = new Dictionary<string, string>();
+        string mLastParameterBlockId = "";
+        private int RenumberParameterBlock(int lParameterBlockCount, XmlNode lAttr) {
+            // for inline parameter blocks like grid and table we need
+            // the same PB number in all subblocks.
+            // we assume, that the iterator first provides the PB and lateron the subPB, 
+            // before the next PB is offered.
+            int lPos = lAttr.Value.IndexOf("_PB-");
+            string lValue = "";
+            if (lAttr.Value.Substring(lPos+4).Contains("_")) {
+                // this is a subblock, we assume, that its main block was already renumbered
+                lValue = lAttr.Value.Substring(0, lAttr.Value.LastIndexOf("_"));
+                // lAttr.Value = lAttr.Value.Replace(lValue, mParameterBlockMap[lValue]);
+                lAttr.Value = lAttr.Value.Replace(lValue, mLastParameterBlockId);
+            } else {
+                // it is a main block, renumber it and store the result
+                lValue = string.Format("{0}-{1}", lAttr.Value.Substring(0, lAttr.Value.LastIndexOf('-')), lParameterBlockCount);
+                // if (mParameterBlockMap.ContainsKey(lAttr.Value)) {
+                //     // number collision? Further checks should find this out
+                // } else {
+                //     mParameterBlockMap.Add(lAttr.Value, lValue);
+                // }
+                mLastParameterBlockId = lValue;
+                lAttr.Value = lValue;
+                lParameterBlockCount += 1;
+            }
+            return lParameterBlockCount;
         }
 
         public int CalcParamSize(XmlNode iParameter, XmlNode iParameterTypesNode) {
@@ -524,12 +565,21 @@ namespace MultiplyChannels {
 
             int lChannelCount = 1;
             int lKoOffset = 1;
+            string lPrefix = "";
 
             // process define node
-            XmlNode lDefineNode = mDocument.SelectSingleNode("//mc:define", nsmgr);
-            if (lDefineNode != null) {
-                lChannelCount = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("NumChannels"));
-                lKoOffset = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("KoOffset"));
+            XmlNodeList lDefineNodes = mDocument.SelectNodes("//mc:define", nsmgr);
+            if (lDefineNodes != null && lDefineNodes.Count > 0) {
+                foreach (XmlNode lDefineNode in lDefineNodes)
+                {
+                    lPrefix = lDefineNode.Attributes.GetNamedItemValueOrEmpty("prefix");
+                    if (lPrefix == "") lPrefix = "LOG"; // backward compatibility
+                    lChannelCount = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("NumChannels"));
+                    lKoOffset = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("KoOffset"));
+                    if (!mDefines.ContainsKey(lPrefix)) {
+                        mDefines.Add(lPrefix, new sDefineContent(lPrefix, lKoOffset, lChannelCount));
+                    }
+                }
             }
 
             //find all XIncludes in a copy of the document
@@ -554,6 +604,17 @@ namespace MultiplyChannels {
                     lHeaderFileName = Path.Combine(iCurrentDir, lHeaderFileName);
                     if (lChildren.Count > 0 && "Parameter | Union | ComObject".Contains(lChildren[0].LocalName)) {
                         // at this point we are including a template file
+                        // ChannelCount and KoOffset are taken from correct prefix
+                        sDefineContent lDefine;
+                        lPrefix = lHeaderPrefixName.Trim('_');
+                        if (mDefines.ContainsKey(lPrefix)) {
+                            lDefine = mDefines[lPrefix];
+                            lChannelCount = lDefine.NumChannels;
+                            lKoOffset = lDefine.KoOffset;
+                        } else {
+                            lChannelCount = 1;
+                            lKoOffset = 1;
+                        }
                         lInclude.ChannelCount = lChannelCount;
                         lInclude.KoOffset = lKoOffset;
                         ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
@@ -576,7 +637,12 @@ namespace MultiplyChannels {
                 // if (lHeaderPrefixName != "") ProcessIncludeFinish(lChildren);
                 //if this fails, something is wrong
             }
-            if (lDefineNode != null) lDefineNode.ParentNode.RemoveChild(lDefineNode);
+            if (lDefineNodes != null && lDefineNodes.Count > 0) {
+                foreach (XmlNode lDefineNode in lDefineNodes)
+                {
+                    lDefineNode.ParentNode.RemoveChild(lDefineNode);
+                }
+            } 
             // catch { }
         }
 
