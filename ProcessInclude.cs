@@ -9,49 +9,15 @@ namespace MultiplyChannels {
     public class ProcessInclude {
 
         const string cOwnNamespace = "http://github.com/mumpf/multiply-channels";
-        private class DefineContent
+        private struct sDefineContent
         {
             public string prefix;
             public int KoOffset;
             public int NumChannels;
-            public string header;
-            private DefineContent(string iPrefix, string iHeader, int iKoOffset, int iNumChannels) {
+            public sDefineContent(string iPrefix, int iKoOffset, int iNumChannels) {
                 prefix = iPrefix;
-                header = iHeader;
                 KoOffset = iKoOffset;
                 NumChannels = iNumChannels;
-            }
-            public static DefineContent Factory(XmlNode iDefineNode) {
-                DefineContent lResult;
-
-                int lChannelCount = 1;
-                int lKoOffset = 1;
-                string lPrefix = "";
-                string lHeader = "";
-            
-                lPrefix = iDefineNode.Attributes.GetNamedItemValueOrEmpty("prefix");
-                if (lPrefix == "") lPrefix = "LOG"; // backward compatibility
-                if (sDefines.ContainsKey(lPrefix)) {
-                    lResult = sDefines[lPrefix];
-                } else {
-                    lHeader = iDefineNode.Attributes.GetNamedItemValueOrEmpty("header");
-                    lChannelCount = int.Parse(iDefineNode.Attributes.GetNamedItemValueOrEmpty("NumChannels"));
-                    lKoOffset = int.Parse(iDefineNode.Attributes.GetNamedItemValueOrEmpty("KoOffset"));
-                    lResult = new DefineContent(lPrefix, lHeader, lKoOffset, lChannelCount);
-                    sDefines.Add(lPrefix, lResult);
-                }
-                return lResult;
-            }
-
-            static public DefineContent Empty = new DefineContent("LOG", "", 1, 1);
-            public static DefineContent GetDefineContent(string iPrefix) {
-                DefineContent lResult;
-                if (sDefines.ContainsKey(iPrefix)) {
-                    lResult = sDefines[iPrefix];
-                } else {
-                    lResult = Empty;
-                }
-                return lResult;
             }
         }
 
@@ -62,7 +28,7 @@ namespace MultiplyChannels {
 
         private XmlNode mParameterTypesNode = null;
         private static Dictionary<string, ProcessInclude> gIncludes = new Dictionary<string, ProcessInclude>();
-        private static Dictionary<string, DefineContent> sDefines = new Dictionary<string, DefineContent>();
+        private Dictionary<string, sDefineContent> mDefines = new Dictionary<string, sDefineContent>();
         private string mXmlFileName;
         private string mHeaderFileName;
         private string mHeaderPrefixName;
@@ -596,11 +562,24 @@ namespace MultiplyChannels {
         public void ResolveIncludes(string iCurrentDir) {
             nsmgr = new XmlNamespaceManager(mDocument.NameTable);
             nsmgr.AddNamespace("mc", cOwnNamespace);
+
+            int lChannelCount = 1;
+            int lKoOffset = 1;
+            string lPrefix = "";
+
             // process define node
             XmlNodeList lDefineNodes = mDocument.SelectNodes("//mc:define", nsmgr);
             if (lDefineNodes != null && lDefineNodes.Count > 0) {
                 foreach (XmlNode lDefineNode in lDefineNodes)
-                    DefineContent.Factory(lDefineNode);
+                {
+                    lPrefix = lDefineNode.Attributes.GetNamedItemValueOrEmpty("prefix");
+                    if (lPrefix == "") lPrefix = "LOG"; // backward compatibility
+                    lChannelCount = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("NumChannels"));
+                    lKoOffset = int.Parse(lDefineNode.Attributes.GetNamedItemValueOrEmpty("KoOffset"));
+                    if (!mDefines.ContainsKey(lPrefix)) {
+                        mDefines.Add(lPrefix, new sDefineContent(lPrefix, lKoOffset, lChannelCount));
+                    }
+                }
             }
 
             //find all XIncludes in a copy of the document
@@ -611,29 +590,33 @@ namespace MultiplyChannels {
             {
                 //Load document...
                 string lIncludeName = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("href");
+                string lHeaderFileName = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("header");
                 string lHeaderPrefixName = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("prefix");
-                DefineContent lDefine = DefineContent.GetDefineContent(lHeaderPrefixName);
-                bool lIsTemplate = (lIncludeNode.Attributes.GetNamedItemValueOrEmpty("type") == "template");
-                bool lIsParameter = (lIncludeNode.Attributes.GetNamedItemValueOrEmpty("type") == "parameter");
-                ProcessInclude lInclude = ProcessInclude.Factory(lIncludeName, lDefine.header, lHeaderPrefixName);
+                ProcessInclude lInclude = ProcessInclude.Factory(lIncludeName, lHeaderFileName, lHeaderPrefixName);
                 lHeaderPrefixName = lInclude.mHeaderPrefixName;
-                lDefine = DefineContent.GetDefineContent(lHeaderPrefixName.Trim('_'));
                 string lTargetPath = Path.Combine(iCurrentDir, lIncludeName);
                 lInclude.LoadAdvanced(lTargetPath);
                 //...find include in real document...
                 XmlNode lParent = lIncludeNode.ParentNode;
                 string lXPath = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("xpath");
                 XmlNodeList lChildren = lInclude.SelectNodes(lXPath);
-                string lHeaderFileName = Path.Combine(iCurrentDir, lDefine.header);
-                // if (lIsParameter) {
-                //     ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
-                // }
-                if (lIsTemplate) {
+                if (lHeaderFileName != "") {
+                    lHeaderFileName = Path.Combine(iCurrentDir, lHeaderFileName);
                     if (lChildren.Count > 0 && "Parameter | Union | ComObject".Contains(lChildren[0].LocalName)) {
                         // at this point we are including a template file
                         // ChannelCount and KoOffset are taken from correct prefix
-                        lInclude.ChannelCount = lDefine.NumChannels;
-                        lInclude.KoOffset = lDefine.KoOffset;
+                        sDefineContent lDefine;
+                        lPrefix = lHeaderPrefixName.Trim('_');
+                        if (mDefines.ContainsKey(lPrefix)) {
+                            lDefine = mDefines[lPrefix];
+                            lChannelCount = lDefine.NumChannels;
+                            lKoOffset = lDefine.KoOffset;
+                        } else {
+                            lChannelCount = 1;
+                            lKoOffset = 1;
+                        }
+                        lInclude.ChannelCount = lChannelCount;
+                        lInclude.KoOffset = lKoOffset;
                         ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
                     }
                 }
