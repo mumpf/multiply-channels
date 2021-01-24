@@ -510,9 +510,17 @@ namespace MultiplyChannels {
                     lMaxSize = Math.Max(lMaxSize, lOffset + (lBits - 1) / 8 + 1);
                     if (lBits <= 7 || lType == "enum") {
                         //output for bit based parameters 
+                        int lShift = (8 - lBits - lBitOffset);
                         lType = string.Format("{0} Bit{1}, Bit {2}", lBits, (lBits == 1) ? "" : "s", (7 - lBitOffset));
-                        if (lBits > 1) lType = string.Format("{0}-{1}", lType, 8 - lBits - lBitOffset);
+                        if (lBits > 1) lType = string.Format("{0}-{1}", lType, lShift);
                         cOut.AppendFormat("#define {3}{0,-25} {1,2}      // {2}", lName, lOffset, lType, iHeaderPrefixName);
+                        if (lBits < 7 && lShift >= 0) {
+                            cOut.AppendLine();
+                            int lMask = ((int)Math.Pow(2, lBits) - 1) << lShift;
+                            cOut.AppendFormat("#define     {0}{1}Mask 0x{2:X2}", iHeaderPrefixName, lName, lMask);
+                            cOut.AppendLine();
+                            cOut.AppendFormat("#define     {0}{1}Shift {2}", iHeaderPrefixName, lName, lShift);
+                        }
                     } else if (lDirectType) {
                         cOut.AppendFormat("#define {3}{0,-25} {1,2}      // {2}", lName, lOffset, lType, iHeaderPrefixName);
                     } else {
