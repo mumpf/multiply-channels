@@ -447,7 +447,7 @@ namespace MultiplyChannels {
                             break;
                         case "TypeFloat":
                             float lDummyFloat;
-                            lSuccess = float.TryParse(iValue, out lDummyFloat);
+                            lSuccess = float.TryParse(iValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out lDummyFloat);
                             if (!lSuccess || iValue.Contains(",")) {
                                 WriteFail(ref iFailPart, "Value of {0} cannot be converted to a float, value is '{1}'", iMessage, iValue);
                             }
