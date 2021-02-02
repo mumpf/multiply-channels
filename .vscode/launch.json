@@ -13,7 +13,7 @@
             "args": [
                 "create",
                 "--Debug",
-                "${env:USERPROFILE}/Documents/PlatformIO/Projects/knx-sensor/src/Sensormodul"
+                "${env:USERPROFILE}/PlatformIO/Projects/knx-sensor/src/Sensormodul"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -28,7 +28,7 @@
             "args": [
                 "create",
                 "--Debug",
-                "${env:USERPROFILE}/Documents/PlatformIO/Projects/knx-wire/src/WireGateway"
+                "${env:USERPROFILE}/PlatformIO/Projects/knx-wire/src/WireGateway"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
@@ -43,7 +43,7 @@
             "args": [
                 "create",
                 "--Debug",
-                "${env:USERPROFILE}/Documents/PlatformIO/Projects/knx-logic/src/Logikmodul"
+                "${env:USERPROFILE}/PlatformIO/Projects/knx-logic/src/Logikmodul"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
