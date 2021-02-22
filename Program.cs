@@ -612,7 +612,12 @@ namespace MultiplyChannels {
                 errs => 1);
         }
 
+        static private void WriteVersion() {
+            Console.WriteLine("{0} {1}", typeof(Program).Assembly.GetName().Name, typeof(Program).Assembly.GetName().Version);
+        }
+
         static private int VerbNew(NewOptions opts) {
+            WriteVersion();
             // Handle defaults
             if (opts.ApplicationName == "") opts.ApplicationName = opts.ProductName;
             if (opts.HardwareName == "") opts.HardwareName = opts.ProductName;
@@ -658,6 +663,7 @@ namespace MultiplyChannels {
         }
 
         static private int VerbCreate(CreateOptions opts) {
+            WriteVersion();
             string lHeaderFileName = Path.ChangeExtension(opts.XmlFileName, "h");
             if (opts.HeaderFileName != "") lHeaderFileName = opts.HeaderFileName;
             Console.WriteLine("Processing xml file {0}", opts.XmlFileName);
@@ -688,6 +694,7 @@ namespace MultiplyChannels {
         }
 
         static private int VerbCheck(CheckOptions opts) {
+            WriteVersion();
             string lFileName = Path.ChangeExtension(opts.XmlFileName, "xml");
             Console.WriteLine("Reading and resolving xml file {0}", lFileName);
             ProcessInclude lResult = ProcessInclude.Factory(opts.XmlFileName, "", "");
@@ -696,6 +703,7 @@ namespace MultiplyChannels {
         }
 
         static private int VerbKnxprod(KnxprodOptions opts) {
+            WriteVersion();
             string lOutputFileName = Path.ChangeExtension(opts.OutputFile, "knxprod");
             if (opts.OutputFile == "") lOutputFileName = Path.ChangeExtension(opts.XmlFileName, "knxprod");
             Console.WriteLine("Reading xml file {0} writing to {1}", opts.XmlFileName, lOutputFileName);
