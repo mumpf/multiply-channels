@@ -96,7 +96,7 @@ namespace MultiplyChannels {
         private static void CreateComment(XmlDocument iTargetNode, XmlNode iNode, string iId, string iSuffix = "") {
             string lNodeId = iId.Substring(0, iId.LastIndexOf("_R"));
             string lTextId = iId;
-            string lNodeName = "Id-mismatch! Nema not found!";
+            string lNodeName = "Id-mismatch! Name not found!";
             string lText = "Id-mismatch! Text not found!";
             if (gIds.ContainsKey(lNodeId)) lNodeName = gIds[lNodeId].NodeAttr("Name");
             if (gIds.ContainsKey(lTextId) && gIds[lTextId].NodeAttr("Text") == "") lTextId = lNodeId;
@@ -321,11 +321,16 @@ namespace MultiplyChannels {
             lNodes = iTargetNode.SelectNodes("//ComObject[@Number]");
             Dictionary<int, bool> lKoNumbers = new Dictionary<int, bool>();
             foreach (XmlNode lNode in lNodes) {
-                int lNumber = int.Parse(lNode.Attributes.GetNamedItem("Number").Value);
-                if (lKoNumbers.ContainsKey(lNumber)) {
-                    WriteFail(ref lFailPart, "{0} is a duplicate Number in ComObject with name {1}", lNumber, lNode.NodeAttr("Name"));
+                int lNumber = 0;
+                bool lIsInt = int.TryParse(lNode.Attributes.GetNamedItem("Number").Value, out lNumber);
+                if (lIsInt) {
+                    if (lKoNumbers.ContainsKey(lNumber)) {
+                        WriteFail(ref lFailPart, "{0} is a duplicate Number in ComObject with name {1}", lNumber, lNode.NodeAttr("Name"));
+                    } else {
+                        lKoNumbers.Add(lNumber, true);
+                    }
                 } else {
-                    lKoNumbers.Add(lNumber, true);
+                    WriteFail(ref lFailPart, "ComObject.Number is not an Integer in ComObject with name {0}", lNode.NodeAttr("Name"));
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
