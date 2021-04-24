@@ -296,8 +296,10 @@ namespace MultiplyChannels {
             // change all Id-Attributes / renumber ParameterSeparator and ParameterBlock
             XmlNode lApplicationProgramNode = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/ApplicationPrograms/ApplicationProgram");
             string lApplicationId = lApplicationProgramNode.Attributes.GetNamedItem("Id").Value;
-            int lApplicationNumber = int.Parse(lApplicationProgramNode.Attributes.GetNamedItem("ApplicationNumber").Value);
-            int lApplicationVersion = int.Parse(lApplicationProgramNode.Attributes.GetNamedItem("ApplicationVersion").Value);
+            int lApplicationNumber = -1;
+            bool lIsInt = int.TryParse(lApplicationProgramNode.Attributes.GetNamedItem("ApplicationNumber").Value, out lApplicationNumber);
+            int lApplicationVersion = -1;
+            lIsInt = int.TryParse(lApplicationProgramNode.Attributes.GetNamedItem("ApplicationVersion").Value, out lApplicationVersion);
             XmlNode lReplacesVersionsAttribute = lApplicationProgramNode.Attributes.GetNamedItem("ReplacesVersions");
             string lOldId = lApplicationId.Replace("M-00FA_A", ""); // CalculateId(1, 1);
             string lNewId = CalculateId(lApplicationNumber, lApplicationVersion);
@@ -322,7 +324,8 @@ namespace MultiplyChannels {
 
             // create registration entry
             XmlNode lHardwareVersionAttribute = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/Hardware/Hardware/@VersionNumber");
-            int lHardwareVersion = int.Parse(lHardwareVersionAttribute.Value);
+            int lHardwareVersion = 1;
+            int.TryParse(lHardwareVersionAttribute.Value, out lHardwareVersion);
             XmlNode lRegistrationNumber = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/Hardware/Hardware/Hardware2Programs/Hardware2Program/RegistrationInfo/@RegistrationNumber");
             if (lRegistrationNumber == null) {
                 Console.WriteLine("- Missing 'RegistrationVersion', no updates via 'ReplacesVersion' in ETS possible!");
@@ -387,7 +390,12 @@ namespace MultiplyChannels {
                     }
                     if (lSizeNode != null) {
                         if (lSizeInBitAttribute != null) {
-                            lResult = (int.Parse(lSizeInBitAttribute.Value) - 1) / 8 + 1;
+                            lResult = 8;
+                            bool lIsInt = int.TryParse(lSizeInBitAttribute.Value, out lResult);
+                            lResult = (lResult - 1) / 8 + 1;
+                            if (!lIsInt) {
+                                Console.WriteLine("Parse error in include {0} in line {1}", mXmlFileName, lSizeNode.InnerXml);
+                            }
                         } else if (lSizeNode.SelectSingleNode("TypeFloat") != null) {
                             lResult = 2;
                         } else if (lSizeNode.SelectSingleNode("TypeColor") != null) {

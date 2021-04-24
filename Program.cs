@@ -73,7 +73,7 @@ namespace MultiplyChannels {
             return lResult;
         }
 
-        static void WriteFail(ref bool iFail, string iFormat, params object[] iParams) {
+        public static void WriteFail(ref bool iFail, string iFormat, params object[] iParams) {
             if (!iFail) Console.WriteLine();
             Console.WriteLine("  --> " + iFormat, iParams);
             iFail = true;
@@ -422,6 +422,24 @@ namespace MultiplyChannels {
                 string lSerialNumber = lNode.Attributes.GetNamedItem("SerialNumber").Value;
                 if (lSerialNumber.Contains("-")) {
                     WriteFail(ref lFailPart, "Hardware.SerialNumber={0}, it contains a dash (-), this will cause problems in knxprod.", lSerialNumber);
+                }
+            }
+            if (!lFailPart) Console.WriteLine(" OK");
+            lFail = lFail || lFailPart;
+
+            lFailPart = false;
+            Console.Write("- Application data...");
+            lNodes = iTargetNode.SelectNodes("//ApplicationProgram");
+            foreach (XmlNode lNode in lNodes) {
+                int lNumber = -1;
+                bool lIsInt = int.TryParse(lNode.Attributes.GetNamedItem("ApplicationNumber").Value, out lNumber);
+                if (!lIsInt || lNumber < 0) {
+                    WriteFail(ref lFailPart, "Applicationprogram.ApplicationNumber is incorrect or could not be parsed");
+                }
+                lNumber = -1;
+                lIsInt = int.TryParse(lNode.Attributes.GetNamedItem("ApplicationVersion").Value, out lNumber);
+                if (!lIsInt || lNumber < 0) {
+                    WriteFail(ref lFailPart, "Applicationprogram.ApplicationVersion is incorrect or could not be parsed");
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
