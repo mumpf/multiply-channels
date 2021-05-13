@@ -13,12 +13,18 @@ namespace MultiplyChannels {
         {
             public string prefix;
             public int KoOffset;
+            public string[] ReplaceKeys = {};
+            public string[] ReplaceValues = {};
             public int NumChannels;
             public string header;
-            private DefineContent(string iPrefix, string iHeader, int iKoOffset, int iNumChannels) {
+            private DefineContent(string iPrefix, string iHeader, int iKoOffset, int iNumChannels, string iReplaceKeys, string iReplaceValues) {
                 prefix = iPrefix;
                 header = iHeader;
                 KoOffset = iKoOffset;
+                if (iReplaceKeys.Length > 0) {
+                    ReplaceKeys = iReplaceKeys.Split(" ");
+                    ReplaceValues = iReplaceValues.Split(" ");
+                }
                 NumChannels = iNumChannels;
             }
             public static DefineContent Factory(XmlNode iDefineNode) {
@@ -28,7 +34,9 @@ namespace MultiplyChannels {
                 int lKoOffset = 1;
                 string lPrefix = "";
                 string lHeader = "";
-            
+                string lReplaceKeys = "";
+                string lReplaceValues = "";
+
                 lPrefix = iDefineNode.Attributes.GetNamedItemValueOrEmpty("prefix");
                 if (lPrefix == "") lPrefix = "LOG"; // backward compatibility
                 if (sDefines.ContainsKey(lPrefix)) {
@@ -37,13 +45,15 @@ namespace MultiplyChannels {
                     lHeader = iDefineNode.Attributes.GetNamedItemValueOrEmpty("header");
                     lChannelCount = int.Parse(iDefineNode.Attributes.GetNamedItemValueOrEmpty("NumChannels"));
                     lKoOffset = int.Parse(iDefineNode.Attributes.GetNamedItemValueOrEmpty("KoOffset"));
-                    lResult = new DefineContent(lPrefix, lHeader, lKoOffset, lChannelCount);
+                    lReplaceKeys = iDefineNode.Attributes.GetNamedItemValueOrEmpty("ReplaceKeys");
+                    lReplaceValues = iDefineNode.Attributes.GetNamedItemValueOrEmpty("ReplaceValues");
+                    lResult = new DefineContent(lPrefix, lHeader, lKoOffset, lChannelCount, lReplaceKeys, lReplaceValues);
                     sDefines.Add(lPrefix, lResult);
                 }
                 return lResult;
             }
 
-            static public DefineContent Empty = new DefineContent("LOG", "", 1, 1);
+            static public DefineContent Empty = new DefineContent("LOG", "", 1, 1, "", "");
             public static DefineContent GetDefineContent(string iPrefix) {
                 DefineContent lResult;
                 if (sDefines.ContainsKey(iPrefix)) {
@@ -74,6 +84,8 @@ namespace MultiplyChannels {
         private int mParameterBlockOffset = 0;
         private int mParameterBlockSize = -1;
         private int mKoOffset = 0;
+        private string[] mReplaceKeys = {};
+        private string[] mReplaceValues = {};
         private int mKoBlockSize = 0;
 
         public int ParameterBlockOffset {
@@ -95,6 +107,16 @@ namespace MultiplyChannels {
             set { mKoOffset = value; }
         }
 
+        public string[] ReplaceKeys {
+            get { return mReplaceKeys; }
+            set { mReplaceKeys = value; }
+        }
+        
+        public string[] ReplaceValues {
+            get { return mReplaceValues; }
+            set { mReplaceValues = value; }
+        }
+        
         public string HeaderGenerated {
             get {
                 mHeaderGenerated.Insert(0, "#pragma once\n#include <knx.h>\n\n");
@@ -179,6 +201,17 @@ namespace MultiplyChannels {
             // DocumentDebugOutput();
         }
 
+        string ReplaceChannelTemplate(string iValue, int iChannel) {
+            string lResult = iValue;
+            Match lMatch = Regex.Match(iValue, @"%(C{1,3})%");
+            if (lMatch.Captures.Count > 0) {
+                int lLen = lMatch.Groups[1].Value.Length;
+                string lFormat = string.Format("D{0}", lLen);
+                lResult = iValue.Replace(lMatch.Value, iChannel.ToString(lFormat));
+            }
+            return lResult;
+        }
+
         string ReplaceKoTemplate(string iValue, int iChannel, ProcessInclude iInclude) {
             string lResult = iValue;
             Match lMatch = Regex.Match(iValue, @"%K(\d{1,3})%");
@@ -198,7 +231,8 @@ namespace MultiplyChannels {
 
         void ProcessAttributes(int iChannel, XmlNode iTargetNode, ProcessInclude iInclude) {
             foreach (XmlAttribute lAttr in iTargetNode.Attributes) {
-                lAttr.Value = lAttr.Value.Replace("%C%", iChannel.ToString());
+                // lAttr.Value = lAttr.Value.Replace("%C%", iChannel.ToString());
+                lAttr.Value = ReplaceChannelTemplate(lAttr.Value, iChannel);
                 lAttr.Value = ReplaceKoTemplate(lAttr.Value, iChannel, iInclude);
                 // lAttr.Value = lAttr.Value.Replace("%N%", mChannelCount.ToString());
             }
@@ -237,7 +271,6 @@ namespace MultiplyChannels {
                 ProcessChannel(iChannel, lChild, iInclude);
             }
         }
-
 
         void ProcessTemplate(int iChannel, XmlNode iTargetNode, ProcessInclude iInclude) {
             ProcessAttributes(iChannel, iTargetNode, iInclude);
@@ -650,6 +683,8 @@ namespace MultiplyChannels {
                         // ChannelCount and KoOffset are taken from correct prefix
                         lInclude.ChannelCount = lDefine.NumChannels;
                         lInclude.KoOffset = lDefine.KoOffset;
+                        lInclude.ReplaceKeys = lDefine.ReplaceKeys;
+                        lInclude.ReplaceValues = lDefine.ReplaceValues;
                         ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
                     }
                 }
@@ -667,6 +702,11 @@ namespace MultiplyChannels {
                 }
                 lParent.RemoveChild(lIncludeNode);
                 if (lInclude.ChannelCount > 1) ReplaceDocumentStrings("%N%", lInclude.ChannelCount.ToString());
+                // we replace also all additional replace key value paris
+                for (int lCount = 0; lCount < lInclude.ReplaceKeys.Length; lCount++)
+                {
+                    ReplaceDocumentStrings(mDocument, lInclude.ReplaceKeys[lCount], lInclude.ReplaceValues[lCount]);
+                }
                 // if (lHeaderPrefixName != "") ProcessIncludeFinish(lChildren);
                 //if this fails, something is wrong
             }

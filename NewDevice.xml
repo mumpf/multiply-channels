@@ -145,10 +145,17 @@
             <AssociationTable MaxEntries="65535" />
             <LoadProcedures>
               <LoadProcedure MergeId="2">
-                <LdCtrlRelSegment LsmIdx="4" Size="4" Mode="0" Fill="0" AppliesTo="full" />
+                <LdCtrlRelSegment LsmIdx="4" Size="0" Mode="1" Fill="0" AppliesTo="full" />
+                <LdCtrlRelSegment LsmIdx="4" Size="0" Mode="0" Fill="0" AppliesTo="par" />
               </LoadProcedure>
               <LoadProcedure MergeId="4">
-                <LdCtrlWriteRelMem ObjIdx="4" Offset="0" Size="4" Verify="true" />
+                <LdCtrlWriteRelMem ObjIdx="4" Offset="0" Size="0" Verify="true" AppliesTo="full,par" />
+              </LoadProcedure>
+              <LoadProcedure MergeId="7">
+                  <LdCtrlLoadImageProp ObjIdx="1" PropId="27" />
+                  <LdCtrlLoadImageProp ObjIdx="2" PropId="27" />
+                  <LdCtrlLoadImageProp ObjIdx="3" PropId="27" />
+                  <LdCtrlLoadImageProp ObjIdx="4" PropId="27" />
               </LoadProcedure>
             </LoadProcedures>
             <Options />
