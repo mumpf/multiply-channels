@@ -17,6 +17,8 @@ namespace MultiplyChannels {
             public string[] ReplaceValues = {};
             public int NumChannels;
             public string header;
+            public bool IsTemplate;
+            public bool IsParameter;
             private DefineContent(string iPrefix, string iHeader, int iKoOffset, int iNumChannels, string iReplaceKeys, string iReplaceValues) {
                 prefix = iPrefix;
                 header = iHeader;
@@ -129,6 +131,7 @@ namespace MultiplyChannels {
             if (gIncludes.ContainsKey(iXmlFileName)) {
                 lInclude = gIncludes[iXmlFileName];
             } else {
+                Console.WriteLine("Processing include {0}", iXmlFileName);
                 lInclude = new ProcessInclude(iXmlFileName, iHeaderFileName, iHeaderPrefixName);
                 gIncludes.Add(iXmlFileName, lInclude);
             }
@@ -513,16 +516,18 @@ namespace MultiplyChannels {
 
         public void ExportHeaderParameterBlock(StringBuilder cOut, XmlNode iParameterTypesNode, string iHeaderPrefixName) {
             if (!mHeaderParameterBlockGenerated) {
-                // cOut.AppendFormat("#define {0}Channels {1}", iHeaderPrefixName, mChannelCount);
-                // cOut.AppendLine();
-                // cOut.AppendLine();
-                cOut.AppendLine("// Parameter per channel");
-                cOut.AppendFormat("#define {0}ParamBlockOffset {1}", iHeaderPrefixName, mParameterBlockOffset);
-                cOut.AppendLine();
-                cOut.AppendFormat("#define {0}ParamBlockSize {1}", iHeaderPrefixName, mParameterBlockSize);
-                cOut.AppendLine();
-                int lSize = ExportHeaderParameter(cOut, iParameterTypesNode, iHeaderPrefixName);
-                // if (lSize != mParameterBlockSize) throw new ArgumentException(string.Format("ParameterBlockSize {0} calculation differs from header filie calculated ParameterBlockSize {1}", mParameterBlockSize, lSize));
+                if (mParameterBlockOffset > 0 && mParameterBlockSize > 0) {
+                    // cOut.AppendFormat("#define {0}Channels {1}", iHeaderPrefixName, mChannelCount);
+                    // cOut.AppendLine();
+                    // cOut.AppendLine();
+                    cOut.AppendLine("// Parameter per channel");
+                    cOut.AppendFormat("#define {0}ParamBlockOffset {1}", iHeaderPrefixName, mParameterBlockOffset);
+                    cOut.AppendLine();
+                    cOut.AppendFormat("#define {0}ParamBlockSize {1}", iHeaderPrefixName, mParameterBlockSize);
+                    cOut.AppendLine();
+                    int lSize = ExportHeaderParameter(cOut, iParameterTypesNode, iHeaderPrefixName);
+                    // if (lSize != mParameterBlockSize) throw new ArgumentException(string.Format("ParameterBlockSize {0} calculation differs from header filie calculated ParameterBlockSize {1}", mParameterBlockSize, lSize));
+                }
                 mHeaderParameterBlockGenerated = true;
             }
         }
@@ -662,23 +667,21 @@ namespace MultiplyChannels {
                 string lIncludeName = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("href");
                 string lHeaderPrefixName = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("prefix");
                 DefineContent lDefine = DefineContent.GetDefineContent(lHeaderPrefixName);
-                bool lIsTemplate = (lIncludeNode.Attributes.GetNamedItemValueOrEmpty("type") == "template");
-                bool lIsParameter = (lIncludeNode.Attributes.GetNamedItemValueOrEmpty("type") == "parameter");
+                lDefine.IsTemplate = (lIncludeNode.Attributes.GetNamedItemValueOrEmpty("type") == "template");
+                lDefine.IsParameter = (lIncludeNode.Attributes.GetNamedItemValueOrEmpty("type") == "parameter");
                 ProcessInclude lInclude = ProcessInclude.Factory(lIncludeName, lDefine.header, lHeaderPrefixName);
-                lHeaderPrefixName = lInclude.mHeaderPrefixName;
-                lDefine = DefineContent.GetDefineContent(lHeaderPrefixName.Trim('_'));
                 string lTargetPath = Path.Combine(iCurrentDir, lIncludeName);
                 lInclude.LoadAdvanced(lTargetPath);
+
+                lHeaderPrefixName = lInclude.mHeaderPrefixName;
+                lDefine = DefineContent.GetDefineContent(lHeaderPrefixName.Trim('_'));
                 //...find include in real document...
                 XmlNode lParent = lIncludeNode.ParentNode;
                 string lXPath = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("xpath");
                 XmlNodeList lChildren = lInclude.SelectNodes(lXPath);
                 string lHeaderFileName = Path.Combine(iCurrentDir, lDefine.header);
-                // if (lIsParameter) {
-                //     ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
-                // }
-                if (lIsTemplate) {
-                    if (lChildren.Count > 0 && "Parameter | Union | ComObject".Contains(lChildren[0].LocalName)) {
+                if (lChildren.Count > 0 && "Parameter | Union | ComObject | SNIPPET".Contains(lChildren[0].LocalName)) {
+                    if (lDefine.IsTemplate) {
                         // at this point we are including a template file
                         // ChannelCount and KoOffset are taken from correct prefix
                         lInclude.ChannelCount = lDefine.NumChannels;
@@ -687,17 +690,22 @@ namespace MultiplyChannels {
                         lInclude.ReplaceValues = lDefine.ReplaceValues;
                         ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
                     }
+                    else if (lDefine.IsParameter) {
+                        ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
+                    }
                 }
                 // here we do template processing and repeat the template as many times as
                 // the Channels parameter in header file
                 for (int lChannel = 1; lChannel <= lInclude.ChannelCount; lChannel++) {
                     foreach (XmlNode lChild in lChildren) {
-                        //necessary for move between XmlDocument contexts
-                        XmlNode lImportNode = lParent.OwnerDocument.ImportNode(lChild, true);
-                        // for any Parameter node we do offset recalculation
-                        // if there is no prefixname, we do no template replacement
-                        if (lHeaderPrefixName != "") ProcessTemplate(lChannel, lImportNode, lInclude);
-                        lParent.InsertBefore(lImportNode, lIncludeNode);
+                        if (lChild.LocalName != "SNIPPET") {
+                            //necessary for move between XmlDocument contexts
+                            XmlNode lImportNode = lParent.OwnerDocument.ImportNode(lChild, true);
+                            // for any Parameter node we do offset recalculation
+                            // if there is no prefixname, we do no template replacement
+                            if (lHeaderPrefixName != "") ProcessTemplate(lChannel, lImportNode, lInclude);
+                            lParent.InsertBefore(lImportNode, lIncludeNode);
+                        }
                     }
                 }
                 lParent.RemoveChild(lIncludeNode);

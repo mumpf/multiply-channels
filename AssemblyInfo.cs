@@ -13,8 +13,8 @@ using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("MultiplyChannels")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("3.1.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("3.1.0")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("3.2.1.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("3.2.1")]
 [assembly: System.Reflection.AssemblyProductAttribute("MultiplyChannels")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MultiplyChannels")]
-[assembly: System.Reflection.AssemblyVersionAttribute("3.1.0.0")]
+[assembly: System.Reflection.AssemblyVersionAttribute("3.2.1.0")]
