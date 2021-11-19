@@ -337,7 +337,8 @@ namespace MultiplyChannels {
             int lApplicationVersion = -1;
             lIsInt = int.TryParse(lApplicationProgramNode.Attributes.GetNamedItem("ApplicationVersion").Value, out lApplicationVersion);
             XmlNode lReplacesVersionsAttribute = lApplicationProgramNode.Attributes.GetNamedItem("ReplacesVersions");
-            string lOldId = lApplicationId.Replace("M-00FA_A", ""); // CalculateId(1, 1);
+            string lOldId = lApplicationId;//.Replace("M-00FA_A", ""); // CalculateId(1, 1);
+            if(lOldId.StartsWith("M-")) lOldId = lOldId.Substring(8);
             string lNewId = CalculateId(lApplicationNumber, lApplicationVersion);
             int lParameterSeparatorCount = 1;
             int lParameterBlockCount = 1;

@@ -61,6 +61,9 @@ namespace MultiplyChannels {
                             lSubdir = EtsVersions[lTempXmlns].Subdir;
                             lPath = Path.Combine(gPathETS, lSubdir);
                             if (Directory.Exists(lPath)) lPath = gPathETS;
+                            else {
+                                lPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, EtsVersions[lXmlns].Subdir);
+                            }
                         }
                     }
                     if (Directory.Exists(lPath)) {
@@ -341,7 +344,8 @@ namespace MultiplyChannels {
             lFailPart = false;
             XmlNode lApplicationProgramNode = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/ApplicationPrograms/ApplicationProgram");
             string lApplicationId = lApplicationProgramNode.Attributes.GetNamedItem("Id").Value;
-            string lRefNs = lApplicationId.Replace("M-00FA_A", "");
+            string lRefNs = lApplicationId; //.Replace("M-00FA_A", "");
+            if(lRefNs.StartsWith("M-")) lRefNs = lRefNs.Substring(8);
             // check all nodes according to refid
             lNodes = iTargetNode.SelectNodes("//*/@*[string-length() > '13']");
             foreach (XmlNode lNode in lNodes) {
@@ -460,12 +464,35 @@ namespace MultiplyChannels {
                     // get first child ignoring comments
                     XmlNode lChild = lParameterTypeNode.ChildNodes[0];
                     while (lChild != null && lChild.NodeType != XmlNodeType.Element) lChild = lChild.NextSibling;
+
+                    int maxSize = (int)Math.Pow(2, int.Parse(lChild.Attributes["SizeInBit"]?.Value ?? "0"));
+                    int min=0, max=0;
                     switch (lChild.Name) {
                         case "TypeNumber":
                             int lDummyInt;
                             bool lSuccess = int.TryParse(iValue, out lDummyInt);
                             if (!lSuccess) {
                                 WriteFail(ref iFailPart, "Value of {0} cannot be converted to a number, value is '{1}'", iMessage, iValue);
+                            }
+                            if(!int.TryParse(lChild.Attributes["minInclusive"]?.Value, out min))
+                                WriteFail(ref iFailPart, "MinInclusive of {0} cannot be converted to a number, value is '{1}'", iMessage, lChild.Attributes["minInclusive"]?.Value ?? "empty");
+                            if(!int.TryParse(lChild.Attributes["maxInclusive"]?.Value, out max))
+                                WriteFail(ref iFailPart, "MaxInclusive of {0} cannot be converted to a number, value is '{1}'", iMessage, lChild.Attributes["minInclusive"]?.Value ?? "empty");
+                            
+                            switch(lChild.Attributes["Type"]?.Value) {
+                                case "unsignedInt":
+                                    if(min < 0)
+                                        WriteFail(ref iFailPart, "MinInclusive of {0} cannot be smaller than 0, value is '{1}'", iMessage, min);
+                                    if(max >= maxSize)
+                                        WriteFail(ref iFailPart, "MaxInclusive of {0} cannot be greater than {1}, value is '{2}'", iMessage, maxSize, max);
+                                    break;
+
+                                case "signedInt":
+                                    if(min < ((maxSize/2)*(-1)))
+                                        WriteFail(ref iFailPart, "MinInclusive of {0} cannot be smaller than {1}, value is '{2}'", iMessage, ((maxSize/2)*(-1)), min);
+                                    if(max > ((maxSize/2)-1))
+                                        WriteFail(ref iFailPart, "MinInclusive of {0} cannot be greater than {1}, value is '{2}'", iMessage, ((maxSize/2)-1), max);
+                                    break;
                             }
                             break;
                         case "TypeFloat":
@@ -477,17 +504,26 @@ namespace MultiplyChannels {
                             break;
                         case "TypeRestriction":
                             lSuccess = false;
+                            int maxEnumValue = -1;
                             foreach (XmlNode lEnumeration in lChild.ChildNodes) {
                                 if (lEnumeration.Name == "Enumeration") {
                                     if (lEnumeration.NodeAttr("Value") == iValue) {
                                         lSuccess = true;
-                                        break;
+                                    }
+                                    int enumValue = 0;
+                                    if(!int.TryParse(lEnumeration.Attributes["Value"]?.Value, out enumValue))
+                                        WriteFail(ref iFailPart, "Enum Value of {2} in {0} cannot be converted to an int, value is '{1}'", iMessage, iValue, lParameterType);
+                                    else {
+                                        if(enumValue > maxEnumValue)
+                                            maxEnumValue = enumValue;
                                     }
                                 }
                             }
                             if (!lSuccess) {
                                 WriteFail(ref iFailPart, "Value of {0} is not contained in enumeration {2}, value is '{1}'", iMessage, iValue, lParameterType);
                             }
+                            if(maxEnumValue >= maxSize)
+                                WriteFail(ref iFailPart, "Max Enum Value of {0} can not be greater than {2}, value is '{1}'", iMessage, maxEnumValue, maxSize);
                             break;
                         default:
                             break;
