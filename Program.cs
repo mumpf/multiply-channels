@@ -28,7 +28,8 @@ namespace MultiplyChannels {
             {"http://knx.org/xml/project/11", new EtsVersion(@"CV\4.0.1997.50261", "ETS 4")},
             {"http://knx.org/xml/project/12", new EtsVersion(@"CV\5.0.204.12971", "ETS 5")},
             {"http://knx.org/xml/project/13", new EtsVersion(@"CV\5.1.84.17602", "ETS 5.5")},
-            {"http://knx.org/xml/project/14", new EtsVersion(@"CV\5.6.241.33672", "ETS 5.6")}
+            {"http://knx.org/xml/project/14", new EtsVersion(@"CV\5.6.241.33672", "ETS 5.6")},
+            {"http://knx.org/xml/project/20", new EtsVersion(@"CV\5.6.241.33672", "ETS 5.7")}
         };
 
         private const string gtoolName = "KNX MT";
@@ -465,7 +466,28 @@ namespace MultiplyChannels {
                     XmlNode lChild = lParameterTypeNode.ChildNodes[0];
                     while (lChild != null && lChild.NodeType != XmlNodeType.Element) lChild = lChild.NextSibling;
 
-                    int maxSize = (int)Math.Pow(2, int.Parse(lChild.Attributes["SizeInBit"]?.Value ?? "0"));
+
+                    int sizeInBit;
+                    long maxSize = 0;
+                    switch(lChild.Name)
+                    {
+                        case "TypeText":
+                            if (!int.TryParse(lChild.Attributes["SizeInBit"]?.Value, out sizeInBit))
+                                WriteFail(ref iFailPart, "SizeInBit of {0} cannot be converted to a number, value is '{1}'", iMessage, lChild.Attributes["SizeInBit"]?.Value ?? "empty");
+                            maxSize = sizeInBit / 8;
+                            break;
+
+                        case "TypeFloat":
+                            //There is no SizeInBit attribute
+                            break;
+
+                        default:
+                            if (!int.TryParse(lChild.Attributes["SizeInBit"]?.Value, out sizeInBit))
+                                WriteFail(ref iFailPart, "SizeInBit of {0} cannot be converted to a number, value is '{1}'", iMessage, lChild.Attributes["SizeInBit"]?.Value ?? "empty");
+                            maxSize = Convert.ToInt64(Math.Pow(2, int.Parse(lChild.Attributes["SizeInBit"]?.Value ?? "0")));
+                            break;
+                    }
+
                     int min=0, max=0;
                     switch (lChild.Name) {
                         case "TypeNumber":
@@ -494,6 +516,7 @@ namespace MultiplyChannels {
                                         WriteFail(ref iFailPart, "MinInclusive of {0} cannot be greater than {1}, value is '{2}'", iMessage, ((maxSize/2)-1), max);
                                     break;
                             }
+                            //TODO check value
                             break;
                         case "TypeFloat":
                             float lDummyFloat;
@@ -501,6 +524,7 @@ namespace MultiplyChannels {
                             if (!lSuccess || iValue.Contains(",")) {
                                 WriteFail(ref iFailPart, "Value of {0} cannot be converted to a float, value is '{1}'", iMessage, iValue);
                             }
+                            //TODO check value
                             break;
                         case "TypeRestriction":
                             lSuccess = false;
@@ -524,6 +548,11 @@ namespace MultiplyChannels {
                             }
                             if(maxEnumValue >= maxSize)
                                 WriteFail(ref iFailPart, "Max Enum Value of {0} can not be greater than {2}, value is '{1}'", iMessage, maxEnumValue, maxSize);
+                            break;
+                        case "TypeText":
+                            //TODO add string length validation
+                            if(iValue.Length > maxSize)
+                                WriteFail(ref iFailPart, "String Length of {0} can not be greater than {2}, length is '{1}'", iMessage, maxSize, iValue.Length);
                             break;
                         default:
                             break;
