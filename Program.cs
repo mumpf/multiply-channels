@@ -23,19 +23,23 @@ namespace MultiplyChannels {
         public string ETS { get; private set; }
     }
     class Program {
-
         private static Dictionary<string, EtsVersion> EtsVersions = new Dictionary<string, EtsVersion>() {
-            {"http://knx.org/xml/project/11", new EtsVersion(@"CV\4.0.1997.50261", "ETS 4")},
-            {"http://knx.org/xml/project/12", new EtsVersion(@"CV\5.0.204.12971", "ETS 5")},
-            {"http://knx.org/xml/project/13", new EtsVersion(@"CV\5.1.84.17602", "ETS 5.5")},
-            {"http://knx.org/xml/project/14", new EtsVersion(@"CV\5.6.241.33672", "ETS 5.6")},
-            {"http://knx.org/xml/project/20", new EtsVersion(@"CV\5.6.241.33672", "ETS 5.7")}
+            {"http://knx.org/xml/project/11", new EtsVersion("4.0.1997.50261", "ETS 4")},
+            {"http://knx.org/xml/project/12", new EtsVersion("5.0.204.12971", "ETS 5")},
+            {"http://knx.org/xml/project/13", new EtsVersion("5.1.84.17602", "ETS 5.5")},
+            {"http://knx.org/xml/project/14", new EtsVersion("5.6.241.33672", "ETS 5.6")},
+            {"http://knx.org/xml/project/20", new EtsVersion("5.7.293.38537", "ETS 5.7")},
+            {"http://knx.org/xml/project/21", new EtsVersion("6.0.4351.0", "ETS 6.0")}
         };
 
         private const string gtoolName = "KNX MT";
         private const string gtoolVersion = "5.1.255.16695";
         //installation path of a valid ETS instance (only ETS4 or ETS5 supported)
-        private static string gPathETS = @"C:\Program Files (x86)\ETS5";
+        private static List<string> gPathETS = new List<string> {
+            @"C:\Program Files (x86)\ETS6",
+            @"C:\Program Files (x86)\ETS5",
+            AppDomain.CurrentDomain.BaseDirectory
+        };
 
         static string FindEtsPath(string iXmlFilename) {
             string lResult = "";
@@ -48,31 +52,31 @@ namespace MultiplyChannels {
                 if (EtsVersions.ContainsKey(lXmlns)) {
                     string lSubdir = EtsVersions[lXmlns].Subdir;
                     string lEts = EtsVersions[lXmlns].ETS;
-                    string lPath = Path.Combine(gPathETS, lSubdir);
-                    if (!Directory.Exists(lPath)) {
-                        // fallback handling
-                        if (lProjectVersion == 11) {
-                            // for project/11 ETS4 might be installed
-                            lPath = gPathETS.Replace("5", "4");
-                            lEts = "ETS 4";
-                        } else {
-                            // for other versions the required DLL might be in ETS installation dir
-                            // in this case the CV dir contains the previous project conversion dlls
-                            string lTempXmlns = string.Format("http://knx.org/xml/project/{0}", lProjectVersion - 1);
-                            lSubdir = EtsVersions[lTempXmlns].Subdir;
-                            lPath = Path.Combine(gPathETS, lSubdir);
-                            if (Directory.Exists(lPath)) lPath = gPathETS;
-                            else {
-                                lPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, EtsVersions[lXmlns].Subdir);
+
+                    foreach(string path in gPathETS) {
+                        if(!Directory.Exists(path)) continue;
+                        if(Directory.Exists(Path.Combine(path, "CV", lSubdir))) //If subdir exists everything ist fine
+                        {
+                            lResult = Path.Combine(path, "CV", lSubdir);
+                            break;
+                        }
+                        else { //otherwise it might be the file in the root folder
+                            if(!File.Exists(Path.Combine(path, "Knx.Ets.XmlSigning.dll"))) continue;
+                            System.Diagnostics.FileVersionInfo versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(Path.Combine(path, "Knx.Ets.XmlSigning.dll"));
+                            string newVersion = versionInfo.FileVersion;
+                            if(newVersion.Split('.').Length != 4) newVersion += ".0";
+                            if(lSubdir == newVersion)
+                            {
+                                lResult = path;
+                                break;
                             }
                         }
                     }
-                    if (Directory.Exists(lPath)) {
-                        lResult = lPath;
+                    
+                    if (!string.IsNullOrEmpty(lResult))
                         Console.WriteLine("Found namespace {1} in xml, will use {0} for conversion...", lEts, lXmlns);
-                    }
                 }
-                if (lResult == "") Console.WriteLine("No valid conversion engine available for xmlns {0}", lXmlns);
+                if (string.IsNullOrEmpty(lResult)) Console.WriteLine("No valid conversion engine available for xmlns {0}", lXmlns);
             }
             return lResult;
         }
