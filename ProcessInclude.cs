@@ -195,6 +195,10 @@ namespace MultiplyChannels {
             }
         }
 
+        public string GetNamespace() {
+            return mDocument.DocumentElement.GetAttribute("xmlns");
+        }
+
         public void Expand() {
             // here we recursively process all includes and all channel repetitions
             LoadAdvanced(mXmlFileName);

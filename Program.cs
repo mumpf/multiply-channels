@@ -7,6 +7,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using CommandLine;
 using System.Linq;
+using System.Xml.Linq;
+using MultiplyChannels.Signing;
 // using Knx.Ets.Xml.ObjectModel;
 
 //using Knx.Ets.Converter.ConverterEngine;
@@ -28,7 +30,8 @@ namespace MultiplyChannels {
             {"http://knx.org/xml/project/12", new EtsVersion("5.0.204.12971", "ETS 5")},
             {"http://knx.org/xml/project/13", new EtsVersion("5.1.84.17602", "ETS 5.5")},
             {"http://knx.org/xml/project/14", new EtsVersion("5.6.241.33672", "ETS 5.6")},
-            {"http://knx.org/xml/project/20", new EtsVersion("5.7.293.38537", "ETS 5.7")},
+            //{"http://knx.org/xml/project/20", new EtsVersion("5.7.293.38537", "ETS 5.7")}, //if we have ets5
+            {"http://knx.org/xml/project/20", new EtsVersion("5.7.298.38537", "ETS 5.7")}, //if we have ets6
             {"http://knx.org/xml/project/21", new EtsVersion("6.0.4351.0", "ETS 6.0")}
         };
 
@@ -41,43 +44,40 @@ namespace MultiplyChannels {
             AppDomain.CurrentDomain.BaseDirectory
         };
 
-        static string FindEtsPath(string iXmlFilename) {
+        static string FindEtsPath(string lXmlns) {
             string lResult = "";
-            if (File.Exists(iXmlFilename)) {
-                string lXmlContent = File.ReadLines(iXmlFilename).Take(2).Aggregate((s1, s2) => s1 + s2);
-                int lStart = lXmlContent.IndexOf("xmlns=\"http://knx.org/xml/project/", 0);
-                string lXmlns = lXmlContent.Substring(lStart + 7, 29);
-                int lProjectVersion = int.Parse(lXmlns.Substring(27));
+            
+            int lProjectVersion = int.Parse(lXmlns.Substring(27));
 
-                if (EtsVersions.ContainsKey(lXmlns)) {
-                    string lSubdir = EtsVersions[lXmlns].Subdir;
-                    string lEts = EtsVersions[lXmlns].ETS;
+            if (EtsVersions.ContainsKey(lXmlns)) {
+                string lSubdir = EtsVersions[lXmlns].Subdir;
+                string lEts = EtsVersions[lXmlns].ETS;
 
-                    foreach(string path in gPathETS) {
-                        if(!Directory.Exists(path)) continue;
-                        if(Directory.Exists(Path.Combine(path, "CV", lSubdir))) //If subdir exists everything ist fine
+                foreach(string path in gPathETS) {
+                    if(!Directory.Exists(path)) continue;
+                    if(Directory.Exists(Path.Combine(path, "CV", lSubdir))) //If subdir exists everything ist fine
+                    {
+                        lResult = Path.Combine(path, "CV", lSubdir);
+                        break;
+                    }
+                    else { //otherwise it might be the file in the root folder
+                        if(!File.Exists(Path.Combine(path, "Knx.Ets.XmlSigning.dll"))) continue;
+                        System.Diagnostics.FileVersionInfo versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(Path.Combine(path, "Knx.Ets.XmlSigning.dll"));
+                        string newVersion = versionInfo.FileVersion;
+                        if(newVersion.Split('.').Length != 4) newVersion += ".0";
+                        if(lSubdir == newVersion)
                         {
-                            lResult = Path.Combine(path, "CV", lSubdir);
+                            lResult = path;
                             break;
                         }
-                        else { //otherwise it might be the file in the root folder
-                            if(!File.Exists(Path.Combine(path, "Knx.Ets.XmlSigning.dll"))) continue;
-                            System.Diagnostics.FileVersionInfo versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(Path.Combine(path, "Knx.Ets.XmlSigning.dll"));
-                            string newVersion = versionInfo.FileVersion;
-                            if(newVersion.Split('.').Length != 4) newVersion += ".0";
-                            if(lSubdir == newVersion)
-                            {
-                                lResult = path;
-                                break;
-                            }
-                        }
                     }
-                    
-                    if (!string.IsNullOrEmpty(lResult))
-                        Console.WriteLine("Found namespace {1} in xml, will use {0} for conversion...", lEts, lXmlns);
                 }
-                if (string.IsNullOrEmpty(lResult)) Console.WriteLine("No valid conversion engine available for xmlns {0}", lXmlns);
+                
+                if (!string.IsNullOrEmpty(lResult))
+                    Console.WriteLine("Found namespace {1} in xml, will use {0} for conversion...", lEts, lXmlns);
             }
+            if (string.IsNullOrEmpty(lResult)) Console.WriteLine("No valid conversion engine available for xmlns {0}", lXmlns);
+            
             return lResult;
         }
 
@@ -594,28 +594,80 @@ namespace MultiplyChannels {
         //     }
         // }
 
-        private static void ExportKnxprod(string iPathETS, string iXmlFileName, string iKnxprodFileName) {
+        private static void ExportKnxprod(string iPathETS, string iXml, string iKnxprodFileName, bool iIsDebug) {
             if (iPathETS == "") return;
             try {
-                var files = new string[] { iXmlFileName };
-                var asmPath = Path.Combine(iPathETS, "Knx.Ets.Converter.ConverterEngine.dll");
-                var asm = Assembly.LoadFrom(asmPath);
-                var eng = asm.GetType("Knx.Ets.Converter.ConverterEngine.ConverterEngine");
-                var bas = asm.GetType("Knx.Ets.Converter.ConverterEngine.ConvertBase");
 
-                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-                InvokeMethod(bas, "Uninitialize", null);
-                //ConvertBase.Uninitialize();
-                //var dset = ConverterEngine.BuildUpRawDocumentSet( files );
-                var dset = InvokeMethod(eng, "BuildUpRawDocumentSet", new object[] { files });
-                //ConverterEngine.CheckOutputFileName(outputFile, ".knxprod");
-                InvokeMethod(eng, "CheckOutputFileName", new object[] { iKnxprodFileName, ".knxprod" });
-                //ConvertBase.CleanUnregistered = false;
-                //SetProperty(bas, "CleanUnregistered", false);
-                //dset = ConverterEngine.ReOrganizeDocumentSet(dset);
-                dset = InvokeMethod(eng, "ReOrganizeDocumentSet", new object[] { dset });
-                //ConverterEngine.PersistDocumentSetAsXmlOutput(dset, outputFile, null, string.Empty, true, _toolName, _toolVersion);
-                InvokeMethod(eng, "PersistDocumentSetAsXmlOutput", new object[] { dset, iKnxprodFileName, null, "", true, gtoolName, gtoolVersion });
+                XDocument xdoc = XDocument.Parse(iXml);
+                string ns = xdoc.Root.Name.NamespaceName;
+                XElement xmanu = xdoc.Root.Element(XName.Get("ManufacturerData", ns)).Element(XName.Get("Manufacturer", ns));
+
+                string manuId = xmanu.Attribute("RefId").Value;
+                string localPath = AppDomain.CurrentDomain.BaseDirectory;
+                if(Directory.Exists(Path.Combine(localPath, "Temp")))
+                    Directory.Delete(Path.Combine(localPath, "Temp"), true);
+                
+                Directory.CreateDirectory(Path.Combine(localPath, "Temp"));
+                Directory.CreateDirectory(Path.Combine(localPath, "Temp", manuId)); //Get real Manu
+
+
+                XElement xcata = xmanu.Element(XName.Get("Catalog", ns));
+                XElement xhard = xmanu.Element(XName.Get("Hardware", ns));
+                XElement xappl = xmanu.Element(XName.Get("ApplicationPrograms", ns));
+
+                //Save Catalog
+                xhard.Remove();
+                xappl.Remove();
+                xdoc.Save(Path.Combine(localPath, "Temp", manuId, "Catalog.xml"));
+
+                xcata.Remove();
+                xmanu.Add(xhard);
+                xdoc.Save(Path.Combine(localPath, "Temp", manuId, "Hardware.xml"));
+
+                xhard.Remove();
+                xmanu.Add(xappl);
+                string appId = xappl.Elements().ElementAt(0).Attribute("Id").Value;
+                xdoc.Save(Path.Combine(localPath, "Temp", manuId, $"{appId}.xml"));
+
+
+                IDictionary<string, string> applProgIdMappings = new Dictionary<string, string>();
+                IDictionary<string, string> applProgHashes = new Dictionary<string, string>();
+                IDictionary<string, string> mapBaggageIdToFileIntegrity = new Dictionary<string, string>(50);
+
+                FileInfo hwFileInfo = new FileInfo(Path.Combine(localPath, "Temp", manuId, "Hardware.xml"));
+                FileInfo catalogFileInfo = new FileInfo(Path.Combine(localPath, "Temp", manuId, "Catalog.xml"));
+                FileInfo appInfo = new FileInfo(Path.Combine(localPath, "Temp", manuId, $"{appId}.xml"));
+                ApplicationProgramHasher aph = new ApplicationProgramHasher(appInfo, mapBaggageIdToFileIntegrity, iPathETS, true);
+                aph.HashFile(); //ETS6 benutzt ApplicationProgramStoreHasher und die Funktion HashStore!
+
+                applProgIdMappings.Add(aph.OldApplProgId, aph.NewApplProgId);
+                if (!applProgHashes.ContainsKey(aph.NewApplProgId))
+                    applProgHashes.Add(aph.NewApplProgId, aph.GeneratedHashString);
+
+                HardwareSigner hws = new HardwareSigner(hwFileInfo, applProgIdMappings, applProgHashes, iPathETS, true);
+                hws.SignFile();
+                IDictionary<string, string> hardware2ProgramIdMapping = hws.OldNewIdMappings;
+
+                CatalogIdPatcher cip = new CatalogIdPatcher(catalogFileInfo, hardware2ProgramIdMapping, iPathETS);
+                cip.Patch();
+
+                XmlSigning.SignDirectory(Path.Combine(localPath, "Temp", manuId), iPathETS);
+
+                Directory.CreateDirectory(Path.Combine(localPath, "Masters"));
+                ns = ns.Substring(ns.LastIndexOf("/")+1);
+                if(!File.Exists(Path.Combine(localPath, "Masters", $"project-{ns}.xml"))) {
+                    var client = new System.Net.WebClient();
+                    client.DownloadFile($"https://update.knx.org/data/XML/project-{ns}/knx_master.xml", Path.Combine(localPath, "Masters", $"project-{ns}.xml"));
+                }
+
+                File.Copy(Path.Combine(localPath, "Masters", $"project-{ns}.xml"), Path.Combine(localPath, "Temp", $"knx_master.xml"));
+                if(File.Exists(iKnxprodFileName)) File.Delete(iKnxprodFileName);
+                System.IO.Compression.ZipFile.CreateFromDirectory(Path.Combine(localPath, "Temp"), iKnxprodFileName);
+
+
+                if(!iIsDebug)
+                    System.IO.Directory.Delete(Path.Combine(localPath, "Temp"), true);
+
                 Console.WriteLine("Output of {0} successful", iKnxprodFileName);
             }
             catch (Exception ex) {
@@ -765,23 +817,16 @@ namespace MultiplyChannels {
             lResult.SetNamespace();
             XmlDocument lXml = lResult.GetDocument();
             bool lSuccess = ProcessSanityChecks(lXml);
-            string lTempXmlFileName = Path.GetTempFileName();
-            File.Delete(lTempXmlFileName);
-            if (opts.Debug) lTempXmlFileName = opts.XmlFileName;
-            lTempXmlFileName = Path.ChangeExtension(lTempXmlFileName, "debug.xml");
-            if (opts.Debug) Console.WriteLine("Writing debug file to {0}", lTempXmlFileName);
-            lXml.Save(lTempXmlFileName);
             Console.WriteLine("Writing header file to {0}", lHeaderFileName);
             File.WriteAllText(lHeaderFileName, lResult.HeaderGenerated);
             string lOutputFileName = Path.ChangeExtension(opts.OutputFile, "knxprod");
             if (opts.OutputFile == "") lOutputFileName = Path.ChangeExtension(opts.XmlFileName, "knxprod");
             if (lSuccess) {
-                string lEtsPath = FindEtsPath(lTempXmlFileName);
-                ExportKnxprod(lEtsPath, lTempXmlFileName, lOutputFileName);
+                string lEtsPath = FindEtsPath(lResult.GetNamespace());
+                ExportKnxprod(lEtsPath, lXml.OuterXml, lOutputFileName, opts.Debug);
             } else {
                 Console.WriteLine("--> Skipping creation of {0} due to check errors! <--", lOutputFileName);
             }
-            if (!opts.Debug) File.Delete(lTempXmlFileName);
             return 0;
         }
 
@@ -799,8 +844,12 @@ namespace MultiplyChannels {
             string lOutputFileName = Path.ChangeExtension(opts.OutputFile, "knxprod");
             if (opts.OutputFile == "") lOutputFileName = Path.ChangeExtension(opts.XmlFileName, "knxprod");
             Console.WriteLine("Reading xml file {0} writing to {1}", opts.XmlFileName, lOutputFileName);
-            string lEtsPath = FindEtsPath(opts.XmlFileName);
-            ExportKnxprod(lEtsPath, opts.XmlFileName, lOutputFileName);
+
+            string xml = File.ReadAllText(opts.XmlFileName);
+            System.Text.RegularExpressions.Regex rs = new System.Text.RegularExpressions.Regex("xmlns=\"(http:\\/\\/knx\\.org\\/xml\\/project\\/[0-9]{1,2})\"");
+            System.Text.RegularExpressions.Match match = rs.Match(xml);
+            string lEtsPath = FindEtsPath(match.Groups[1].Value);
+            ExportKnxprod(lEtsPath, xml, lOutputFileName, false);
             return 0;
         }
     }

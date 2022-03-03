@@ -10,6 +10,9 @@
     <!-- <PackageReference Include="System.Text.Encoding.CodePages" Version="4.7.0" /> -->
   </ItemGroup>
   <ItemGroup>
+    <None Update="Masters\project-20.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <Content Remove="NewDevice.xml" />
   </ItemGroup>
   <ItemGroup>
