@@ -12,23 +12,24 @@ namespace MultiplyChannels.Signing
                 IDictionary<string, string> applProgIdMappings,
                 IDictionary<string, string> applProgHashes,
                 string basePath,
-                int namespaceVersion,
+                int nsVersion,
                 bool patchIds)
         {
-            Assembly asm1 = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.XmlSigning.dll"));
-            Assembly asm2 = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.Xml.ObjectModel.dll"));
+            Assembly asm = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.XmlSigning.dll"));
+            Assembly objm = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.Xml.ObjectModel.dll"));
 
-            Type RegistrationKeyEnum = asm2.GetType("Knx.Ets.Xml.ObjectModel.RegistrationKey");
+            Type RegistrationKeyEnum = objm.GetType("Knx.Ets.Xml.ObjectModel.RegistrationKey");
             object registrationKey = Enum.Parse(RegistrationKeyEnum, "knxconv");
 
-            if(basePath.Contains("ETS6") || basePath.Contains("6.0")) {
+            if(asm.GetName().Version.ToString().StartsWith("6.0")) {
                 // registrationKey= Knx.Ets.Xml.ObjectModel.RegistrationKey.knxconv (is an enum)
-                _instance = Activator.CreateInstance(asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner"), hardwareFile, applProgIdMappings, applProgHashes, patchIds, registrationKey, null);
-                _type = asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner");
+                object knxSchemaVersion = Enum.ToObject(objm.GetType("Knx.Ets.Xml.ObjectModel.KnxXmlSchemaVersion"), nsVersion);
+                _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.HardwareSigner"), hardwareFile, applProgIdMappings, applProgHashes, patchIds, registrationKey, knxSchemaVersion);
+                _type = asm.GetType("Knx.Ets.XmlSigning.HardwareSigner");
             } else {
                 // registrationKey= Knx.Ets.Xml.ObjectModel.RegistrationKey.knxconv (is an enum)
-                _instance = Activator.CreateInstance(asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner"), hardwareFile, applProgIdMappings, applProgHashes, patchIds, registrationKey);
-                _type = asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner");
+                _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.HardwareSigner"), hardwareFile, applProgIdMappings, applProgHashes, patchIds, registrationKey);
+                _type = asm.GetType("Knx.Ets.XmlSigning.HardwareSigner");
             }
         }
 

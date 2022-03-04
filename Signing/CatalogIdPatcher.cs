@@ -11,12 +11,14 @@ namespace MultiplyChannels.Signing
             FileInfo catalogFile,
             IDictionary<string, string> hardware2ProgramIdMapping,
             string basePath,
-            int namespaceVersion)
+            int nsVersion)
         {
             Assembly asm = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.XmlSigning.dll"));
 
-            if(basePath.Contains("ETS6") || basePath.Contains("6.0")) {
-                _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.CatalogIdPatcher"), catalogFile, hardware2ProgramIdMapping, null);
+            if(asm.GetName().Version.ToString().StartsWith("6.0")) {
+                Assembly objm = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.Xml.ObjectModel.dll"));
+                object knxSchemaVersion = Enum.ToObject(objm.GetType("Knx.Ets.Xml.ObjectModel.KnxXmlSchemaVersion"), nsVersion);
+                _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.CatalogIdPatcher"), catalogFile, hardware2ProgramIdMapping, knxSchemaVersion);
                 _type = asm.GetType("Knx.Ets.XmlSigning.CatalogIdPatcher");
             } else {
                 _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.CatalogIdPatcher"), catalogFile, hardware2ProgramIdMapping);

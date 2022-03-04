@@ -7,8 +7,6 @@ namespace MultiplyChannels.Signing
 {
     class ApplicationProgramHasher
     {
-        private int NamespaceVersion;
-
         public ApplicationProgramHasher(
                     FileInfo applProgFile,
                     IDictionary<string, string> mapBaggageIdToFileIntegrity,
@@ -16,13 +14,14 @@ namespace MultiplyChannels.Signing
                     int nsVersion,
                     bool patchIds = true)
         {
-            NamespaceVersion = nsVersion;
             //if ets6 use ApplicationProgramStoreHasher
             //with HashStore Method
             Assembly asm = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.XmlSigning.dll"));
 
-            if(basePath.Contains("ETS6") || basePath.Contains("6.0")) { //ab ETS6
-                _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher"), applProgFile, mapBaggageIdToFileIntegrity, patchIds, null);
+            if(asm.GetName().Version.ToString().StartsWith("6.0")) { //ab ETS6
+                Assembly objm = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.Xml.ObjectModel.dll"));
+                object knxSchemaVersion = Enum.ToObject(objm.GetType("Knx.Ets.Xml.ObjectModel.KnxXmlSchemaVersion"), nsVersion);
+                _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher"), applProgFile, mapBaggageIdToFileIntegrity, patchIds, knxSchemaVersion);
                 _type = asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher");
             } else { //für ETS5 und früher
                 _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher"), applProgFile, mapBaggageIdToFileIntegrity, patchIds);
@@ -32,11 +31,7 @@ namespace MultiplyChannels.Signing
 
         public void Hash()
         {
-            //if(NamespaceVersion >= 21) { //ab ETS6
-            //    _type.GetMethod("HashStore", BindingFlags.Instance | BindingFlags.Public).Invoke(_instance, null);
-            //} else { //für ETS5 und früher
-                _type.GetMethod("HashFile", BindingFlags.Instance | BindingFlags.Public).Invoke(_instance, null);
-            //}
+             _type.GetMethod("HashFile", BindingFlags.Instance | BindingFlags.Public).Invoke(_instance, null);
         }
 
         public string OldApplProgId
