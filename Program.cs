@@ -49,33 +49,49 @@ namespace MultiplyChannels {
             int lProjectVersion = int.Parse(lXmlns.Substring(27));
 
             if (EtsVersions.ContainsKey(lXmlns)) {
-                string lSubdir = EtsVersions[lXmlns].Subdir;
-                string lEts = EtsVersions[lXmlns].ETS;
+                string lEts = "";
+                //if we found an ets6, we can generate all versions with it
+                if(Directory.Exists(@"C:\Program Files (x86)\ETS6")) {
+                    lResult = @"C:\Program Files (x86)\ETS6";
+                    lEts = "ETS 6";
+                }
+                
+                //if we found ets6 dlls, we can generate all versions with it
+                if(Directory.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CV", "6.0"))) {
+                    lResult = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CV", "6.0");
+                    lEts = "ETS 6 (local)";
+                }
 
-                foreach(string path in gPathETS) {
-                    if(!Directory.Exists(path)) continue;
-                    if(Directory.Exists(Path.Combine(path, "CV", lSubdir))) //If subdir exists everything ist fine
-                    {
-                        lResult = Path.Combine(path, "CV", lSubdir);
-                        break;
-                    }
-                    else { //otherwise it might be the file in the root folder
-                        if(!File.Exists(Path.Combine(path, "Knx.Ets.XmlSigning.dll"))) continue;
-                        System.Diagnostics.FileVersionInfo versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(Path.Combine(path, "Knx.Ets.XmlSigning.dll"));
-                        string newVersion = versionInfo.FileVersion;
-                        if (lSubdir.Split('.').Length == 2) newVersion = string.Join('.', newVersion.Split('.').Take(2));
-                        // if(newVersion.Split('.').Length != 4) newVersion += ".0";
+                //else search for an older ETS or CV files
+                if(string.IsNullOrEmpty(lResult)) {
+                    string lSubdir = EtsVersions[lXmlns].Subdir;
+                    lEts = EtsVersions[lXmlns].ETS;
 
-                        if(lSubdir == newVersion)
+                    foreach(string path in gPathETS) {
+                        if(!Directory.Exists(path)) continue;
+                        if(Directory.Exists(Path.Combine(path, "CV", lSubdir))) //If subdir exists everything ist fine
                         {
-                            lResult = path;
+                            lResult = Path.Combine(path, "CV", lSubdir);
                             break;
+                        }
+                        else { //otherwise it might be the file in the root folder
+                            if(!File.Exists(Path.Combine(path, "Knx.Ets.XmlSigning.dll"))) continue;
+                            System.Diagnostics.FileVersionInfo versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(Path.Combine(path, "Knx.Ets.XmlSigning.dll"));
+                            string newVersion = versionInfo.FileVersion;
+                            if (lSubdir.Split('.').Length == 2) newVersion = string.Join('.', newVersion.Split('.').Take(2));
+                            // if(newVersion.Split('.').Length != 4) newVersion += ".0";
+
+                            if(lSubdir == newVersion)
+                            {
+                                lResult = path;
+                                break;
+                            }
                         }
                     }
                 }
                 
                 if (!string.IsNullOrEmpty(lResult))
-                    Console.WriteLine("Found namespace {1} in xml, will use {0} for conversion...", lEts, lXmlns);
+                    Console.WriteLine("Found namespace {1} in xml, will use {0} for conversion... (Path: {2})", lEts, lXmlns, lResult);
             }
             if (string.IsNullOrEmpty(lResult)) Console.WriteLine("No valid conversion engine available for xmlns {0}", lXmlns);
             
@@ -642,18 +658,20 @@ namespace MultiplyChannels {
                 FileInfo hwFileInfo = new FileInfo(Path.Combine(localPath, "Temp", manuId, "Hardware.xml"));
                 FileInfo catalogFileInfo = new FileInfo(Path.Combine(localPath, "Temp", manuId, "Catalog.xml"));
                 FileInfo appInfo = new FileInfo(Path.Combine(localPath, "Temp", manuId, $"{appId}.xml"));
-                ApplicationProgramHasher aph = new ApplicationProgramHasher(appInfo, mapBaggageIdToFileIntegrity, iPathETS, true);
-                aph.HashFile(); //ETS6 benutzt ApplicationProgramStoreHasher und die Funktion HashStore!
+
+                int nsVersion = int.Parse(ns.Substring(ns.LastIndexOf('/')+1));
+                ApplicationProgramHasher aph = new ApplicationProgramHasher(appInfo, mapBaggageIdToFileIntegrity, iPathETS, nsVersion, true);
+                aph.Hash(); //ETS6 benutzt ApplicationProgramStoreHasher und die Funktion HashStore!
 
                 applProgIdMappings.Add(aph.OldApplProgId, aph.NewApplProgId);
                 if (!applProgHashes.ContainsKey(aph.NewApplProgId))
                     applProgHashes.Add(aph.NewApplProgId, aph.GeneratedHashString);
 
-                HardwareSigner hws = new HardwareSigner(hwFileInfo, applProgIdMappings, applProgHashes, iPathETS, true);
+                HardwareSigner hws = new HardwareSigner(hwFileInfo, applProgIdMappings, applProgHashes, iPathETS, nsVersion, true);
                 hws.SignFile();
                 IDictionary<string, string> hardware2ProgramIdMapping = hws.OldNewIdMappings;
 
-                CatalogIdPatcher cip = new CatalogIdPatcher(catalogFileInfo, hardware2ProgramIdMapping, iPathETS);
+                CatalogIdPatcher cip = new CatalogIdPatcher(catalogFileInfo, hardware2ProgramIdMapping, iPathETS, nsVersion);
                 cip.Patch();
 
                 XmlSigning.SignDirectory(Path.Combine(localPath, "Temp", manuId), iPathETS);
