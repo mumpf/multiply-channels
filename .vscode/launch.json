@@ -43,7 +43,7 @@
             "args": [
                 "create",
                 "--Debug",
-                "../Projects/knx-logic/src/Logikmodul"
+                "../OpenKNX/OAM-LogicModule/src/Logikmodul"
             ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",

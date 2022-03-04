@@ -30,9 +30,8 @@ namespace MultiplyChannels {
             {"http://knx.org/xml/project/12", new EtsVersion("5.0.204.12971", "ETS 5")},
             {"http://knx.org/xml/project/13", new EtsVersion("5.1.84.17602", "ETS 5.5")},
             {"http://knx.org/xml/project/14", new EtsVersion("5.6.241.33672", "ETS 5.6")},
-            //{"http://knx.org/xml/project/20", new EtsVersion("5.7.293.38537", "ETS 5.7")}, //if we have ets5
-            {"http://knx.org/xml/project/20", new EtsVersion("5.7.298.38537", "ETS 5.7")}, //if we have ets6
-            {"http://knx.org/xml/project/21", new EtsVersion("6.0.4351.0", "ETS 6.0")}
+            {"http://knx.org/xml/project/20", new EtsVersion("5.7", "ETS 5.7")},
+            {"http://knx.org/xml/project/21", new EtsVersion("6.0", "ETS 6.0")}
         };
 
         private const string gtoolName = "KNX MT";
@@ -64,7 +63,9 @@ namespace MultiplyChannels {
                         if(!File.Exists(Path.Combine(path, "Knx.Ets.XmlSigning.dll"))) continue;
                         System.Diagnostics.FileVersionInfo versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(Path.Combine(path, "Knx.Ets.XmlSigning.dll"));
                         string newVersion = versionInfo.FileVersion;
-                        if(newVersion.Split('.').Length != 4) newVersion += ".0";
+                        if (lSubdir.Split('.').Length == 2) newVersion = string.Join('.', newVersion.Split('.').Take(2));
+                        // if(newVersion.Split('.').Length != 4) newVersion += ".0";
+
                         if(lSubdir == newVersion)
                         {
                             lResult = path;
@@ -485,6 +486,10 @@ namespace MultiplyChannels {
                             //There is no SizeInBit attribute
                             break;
 
+                        case "TypeColor":
+                            //There is no SizeInBit attribute
+                            break;
+
                         default:
                             if (!int.TryParse(lChild.Attributes["SizeInBit"]?.Value, out sizeInBit))
                                 WriteFail(ref iFailPart, "SizeInBit of {0} cannot be converted to a number, value is '{1}'", iMessage, lChild.Attributes["SizeInBit"]?.Value ?? "empty");
@@ -817,6 +822,12 @@ namespace MultiplyChannels {
             lResult.SetNamespace();
             XmlDocument lXml = lResult.GetDocument();
             bool lSuccess = ProcessSanityChecks(lXml);
+            string lTempXmlFileName = Path.GetTempFileName();
+            File.Delete(lTempXmlFileName);
+            if (opts.Debug) lTempXmlFileName = opts.XmlFileName;
+            lTempXmlFileName = Path.ChangeExtension(lTempXmlFileName, "debug.xml");
+            if (opts.Debug) Console.WriteLine("Writing debug file to {0}", lTempXmlFileName);
+            lXml.Save(lTempXmlFileName);
             Console.WriteLine("Writing header file to {0}", lHeaderFileName);
             File.WriteAllText(lHeaderFileName, lResult.HeaderGenerated);
             string lOutputFileName = Path.ChangeExtension(opts.OutputFile, "knxprod");
