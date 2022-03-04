@@ -642,18 +642,20 @@ namespace MultiplyChannels {
                 FileInfo hwFileInfo = new FileInfo(Path.Combine(localPath, "Temp", manuId, "Hardware.xml"));
                 FileInfo catalogFileInfo = new FileInfo(Path.Combine(localPath, "Temp", manuId, "Catalog.xml"));
                 FileInfo appInfo = new FileInfo(Path.Combine(localPath, "Temp", manuId, $"{appId}.xml"));
-                ApplicationProgramHasher aph = new ApplicationProgramHasher(appInfo, mapBaggageIdToFileIntegrity, iPathETS, true);
-                aph.HashFile(); //ETS6 benutzt ApplicationProgramStoreHasher und die Funktion HashStore!
+
+                int nsVersion = int.Parse(ns.Substring(ns.LastIndexOf('/')+1));
+                ApplicationProgramHasher aph = new ApplicationProgramHasher(appInfo, mapBaggageIdToFileIntegrity, iPathETS, nsVersion, true);
+                aph.Hash(); //ETS6 benutzt ApplicationProgramStoreHasher und die Funktion HashStore!
 
                 applProgIdMappings.Add(aph.OldApplProgId, aph.NewApplProgId);
                 if (!applProgHashes.ContainsKey(aph.NewApplProgId))
                     applProgHashes.Add(aph.NewApplProgId, aph.GeneratedHashString);
 
-                HardwareSigner hws = new HardwareSigner(hwFileInfo, applProgIdMappings, applProgHashes, iPathETS, true);
+                HardwareSigner hws = new HardwareSigner(hwFileInfo, applProgIdMappings, applProgHashes, iPathETS, nsVersion, true);
                 hws.SignFile();
                 IDictionary<string, string> hardware2ProgramIdMapping = hws.OldNewIdMappings;
 
-                CatalogIdPatcher cip = new CatalogIdPatcher(catalogFileInfo, hardware2ProgramIdMapping, iPathETS);
+                CatalogIdPatcher cip = new CatalogIdPatcher(catalogFileInfo, hardware2ProgramIdMapping, iPathETS, nsVersion);
                 cip.Patch();
 
                 XmlSigning.SignDirectory(Path.Combine(localPath, "Temp", manuId), iPathETS);

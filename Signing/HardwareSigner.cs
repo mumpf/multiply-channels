@@ -12,6 +12,7 @@ namespace MultiplyChannels.Signing
                 IDictionary<string, string> applProgIdMappings,
                 IDictionary<string, string> applProgHashes,
                 string basePath,
+                int namespaceVersion,
                 bool patchIds)
         {
             Assembly asm1 = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.XmlSigning.dll"));
@@ -20,9 +21,15 @@ namespace MultiplyChannels.Signing
             Type RegistrationKeyEnum = asm2.GetType("Knx.Ets.Xml.ObjectModel.RegistrationKey");
             object registrationKey = Enum.Parse(RegistrationKeyEnum, "knxconv");
 
-            // registrationKey= Knx.Ets.Xml.ObjectModel.RegistrationKey.knxconv (is an enum)
-            _instance = Activator.CreateInstance(asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner"), hardwareFile, applProgIdMappings, applProgHashes, patchIds, registrationKey);
-            _type = asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner");
+            if(basePath.Contains("ETS6") || basePath.Contains("6.0")) {
+                // registrationKey= Knx.Ets.Xml.ObjectModel.RegistrationKey.knxconv (is an enum)
+                _instance = Activator.CreateInstance(asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner"), hardwareFile, applProgIdMappings, applProgHashes, patchIds, registrationKey, null);
+                _type = asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner");
+            } else {
+                // registrationKey= Knx.Ets.Xml.ObjectModel.RegistrationKey.knxconv (is an enum)
+                _instance = Activator.CreateInstance(asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner"), hardwareFile, applProgIdMappings, applProgHashes, patchIds, registrationKey);
+                _type = asm1.GetType("Knx.Ets.XmlSigning.HardwareSigner");
+            }
         }
 
         public void SignFile()

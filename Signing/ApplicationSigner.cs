@@ -7,22 +7,36 @@ namespace MultiplyChannels.Signing
 {
     class ApplicationProgramHasher
     {
+        private int NamespaceVersion;
+
         public ApplicationProgramHasher(
                     FileInfo applProgFile,
                     IDictionary<string, string> mapBaggageIdToFileIntegrity,
                     string basePath,
+                    int nsVersion,
                     bool patchIds = true)
         {
+            NamespaceVersion = nsVersion;
             //if ets6 use ApplicationProgramStoreHasher
             //with HashStore Method
             Assembly asm = Assembly.LoadFrom(Path.Combine(basePath, "Knx.Ets.XmlSigning.dll"));
-            _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher"), applProgFile, mapBaggageIdToFileIntegrity, patchIds);
-            _type = asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher");
+
+            if(basePath.Contains("ETS6") || basePath.Contains("6.0")) { //ab ETS6
+                _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher"), applProgFile, mapBaggageIdToFileIntegrity, patchIds, null);
+                _type = asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher");
+            } else { //für ETS5 und früher
+                _instance = Activator.CreateInstance(asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher"), applProgFile, mapBaggageIdToFileIntegrity, patchIds);
+                _type = asm.GetType("Knx.Ets.XmlSigning.ApplicationProgramHasher");
+            }
         }
 
-        public void HashFile()
+        public void Hash()
         {
-            _type.GetMethod("HashFile", BindingFlags.Instance | BindingFlags.Public).Invoke(_instance, null);
+            //if(NamespaceVersion >= 21) { //ab ETS6
+            //    _type.GetMethod("HashStore", BindingFlags.Instance | BindingFlags.Public).Invoke(_instance, null);
+            //} else { //für ETS5 und früher
+                _type.GetMethod("HashFile", BindingFlags.Instance | BindingFlags.Public).Invoke(_instance, null);
+            //}
         }
 
         public string OldApplProgId
