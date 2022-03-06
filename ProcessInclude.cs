@@ -212,6 +212,21 @@ namespace MultiplyChannels {
                 string lFormat = string.Format("D{0}", lLen);
                 lResult = iValue.Replace(lMatch.Value, iChannel.ToString(lFormat));
             }
+
+            lMatch = Regex.Match(lResult, @"%(Z{1,3})%");
+            if (lMatch.Captures.Count > 0)
+            {
+                int lLen = lMatch.Groups[1].Value.Length;
+                string channelName = "";
+                int temp_Channel = iChannel-1;
+                for (int i = 0; i < lLen; i++) {
+                    if(temp_Channel >= 0) channelName = Convert.ToChar((temp_Channel) % 26 + 65) + channelName;
+                    temp_Channel /= 26;
+                    temp_Channel--;
+                }
+                lResult = iValue.Replace(lMatch.Value, channelName);
+            }
+
             return lResult;
         }
 
