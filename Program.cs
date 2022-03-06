@@ -647,7 +647,7 @@ namespace MultiplyChannels {
 
                 xhard.Remove();
                 xmanu.Add(xappl);
-                string appId = xappl.Elements().ElementAt(0).Attribute("Id").Value;
+                string appId = xappl.Elements(XName.Get("ApplicationProgram", ns)).First().Attribute("Id").Value;
                 xdoc.Save(Path.Combine(localPath, "Temp", manuId, $"{appId}.xml"));
 
 
