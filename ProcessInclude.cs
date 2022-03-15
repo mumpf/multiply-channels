@@ -4,6 +4,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Text;
+using System.Linq;
 
 namespace MultiplyChannels {
     public class ProcessInclude {
@@ -16,10 +17,11 @@ namespace MultiplyChannels {
             public string[] ReplaceKeys = {};
             public string[] ReplaceValues = {};
             public int NumChannels;
+            public int ModuleType;
             public string header;
             public bool IsTemplate;
             public bool IsParameter;
-            private DefineContent(string iPrefix, string iHeader, int iKoOffset, int iNumChannels, string iReplaceKeys, string iReplaceValues) {
+            private DefineContent(string iPrefix, string iHeader, int iKoOffset, int iNumChannels, string iReplaceKeys, string iReplaceValues, int iModuleType) {
                 prefix = iPrefix;
                 header = iHeader;
                 KoOffset = iKoOffset;
@@ -28,6 +30,7 @@ namespace MultiplyChannels {
                     ReplaceValues = iReplaceValues.Split(" ");
                 }
                 NumChannels = iNumChannels;
+                ModuleType = iModuleType;
             }
             public static DefineContent Factory(XmlNode iDefineNode) {
                 DefineContent lResult;
@@ -38,6 +41,7 @@ namespace MultiplyChannels {
                 string lHeader = "";
                 string lReplaceKeys = "";
                 string lReplaceValues = "";
+                int lModuleType = 1;
 
                 lPrefix = iDefineNode.Attributes.GetNamedItemValueOrEmpty("prefix");
                 if (lPrefix == "") lPrefix = "LOG"; // backward compatibility
@@ -49,13 +53,14 @@ namespace MultiplyChannels {
                     lKoOffset = int.Parse(iDefineNode.Attributes.GetNamedItemValueOrEmpty("KoOffset"));
                     lReplaceKeys = iDefineNode.Attributes.GetNamedItemValueOrEmpty("ReplaceKeys");
                     lReplaceValues = iDefineNode.Attributes.GetNamedItemValueOrEmpty("ReplaceValues");
-                    lResult = new DefineContent(lPrefix, lHeader, lKoOffset, lChannelCount, lReplaceKeys, lReplaceValues);
+                    lModuleType = int.Parse(iDefineNode.Attributes.GetNamedItemValueOrEmpty("ModuleType"));
+                    lResult = new DefineContent(lPrefix, lHeader, lKoOffset, lChannelCount, lReplaceKeys, lReplaceValues, lModuleType);
                     sDefines.Add(lPrefix, lResult);
                 }
                 return lResult;
             }
 
-            static public DefineContent Empty = new DefineContent("LOG", "", 1, 1, "", "");
+            static public DefineContent Empty = new DefineContent("LOG", "", 1, 1, "", "", 1);
             public static DefineContent GetDefineContent(string iPrefix) {
                 DefineContent lResult;
                 if (sDefines.ContainsKey(iPrefix)) {
@@ -86,6 +91,7 @@ namespace MultiplyChannels {
         private int mParameterBlockOffset = 0;
         private int mParameterBlockSize = -1;
         private int mKoOffset = 0;
+        private int mModuleType = 1;
         private string[] mReplaceKeys = {};
         private string[] mReplaceValues = {};
         private int mKoBlockSize = 0;
@@ -107,6 +113,11 @@ namespace MultiplyChannels {
         public int KoOffset {
             get { return mKoOffset; }
             set { mKoOffset = value; }
+        }
+
+        public int ModuleType {
+            get { return mModuleType; }
+            set { mModuleType = value; }
         }
 
         public string[] ReplaceKeys {
@@ -202,7 +213,8 @@ namespace MultiplyChannels {
         public void Expand() {
             // here we recursively process all includes and all channel repetitions
             LoadAdvanced(mXmlFileName);
-            ExportHeader(mHeaderFileName, mHeaderPrefixName, this);
+            // we use here an empty DefineContent, just for startup
+            ExportHeader(DefineContent.Empty, mHeaderFileName, mHeaderPrefixName, this);
             // finally we do all processing necessary for the whole (resolved) document
             ProcessFinish(mDocument);
             // DocumentDebugOutput();
@@ -253,7 +265,7 @@ namespace MultiplyChannels {
 
         void ProcessAttributes(int iChannel, XmlNode iTargetNode, ProcessInclude iInclude) {
             foreach (XmlAttribute lAttr in iTargetNode.Attributes) {
-                // lAttr.Value = lAttr.Value.Replace("%C%", iChannel.ToString());
+                lAttr.Value = lAttr.Value.Replace("%T%", iInclude.ModuleType.ToString());
                 lAttr.Value = ReplaceChannelTemplate(lAttr.Value, iChannel);
                 lAttr.Value = ReplaceKoTemplate(lAttr.Value, iChannel, iInclude);
                 // lAttr.Value = lAttr.Value.Replace("%N%", mChannelCount.ToString());
@@ -266,7 +278,8 @@ namespace MultiplyChannels {
             if (lMemory != null) {
                 XmlNode lAttr = lMemory.Attributes.GetNamedItem("Offset");
                 int lOffset = int.Parse(lAttr.Value);
-                lOffset += iInclude.ParameterBlockOffset + (iChannel - 1) * iInclude.ParameterBlockSize;
+                if (iInclude.ChannelCount > 1)   // parameters with single occurence are not used for template size processing // TODO: Relative single occuance parameters
+                    lOffset += iInclude.ParameterBlockOffset + (iChannel - 1) * iInclude.ParameterBlockSize;
                 lAttr.Value = lOffset.ToString();
             }
         }
@@ -340,6 +353,39 @@ namespace MultiplyChannels {
         }
 
         void ProcessFinish(XmlNode iTargetNode) {
+            XmlNode lApplicationProgramNode = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/ApplicationPrograms/ApplicationProgram");
+            // evaluate mc:version, if available
+            XmlNode lMcVersionNode = iTargetNode.SelectSingleNode("//mc:version", nsmgr);
+            string lInlineData = "";
+            if (lMcVersionNode != null) {
+                // found mc:version, we apply its attributes to knxprod-xml
+                int lOpenKnxId = Convert.ToInt32(lMcVersionNode.Attributes.GetNamedItem("OpenKnxId").Value, 16);
+                int lAppNumber = Convert.ToInt32(lMcVersionNode.Attributes.GetNamedItem("ApplicationNumber").Value, 10);
+                int lCalcAppNumber = (lAppNumber + (lOpenKnxId << 8));
+                lApplicationProgramNode.Attributes.GetNamedItem("ApplicationNumber").Value = lCalcAppNumber.ToString();
+                int lAppVersion = Convert.ToInt32(lMcVersionNode.Attributes.GetNamedItem("ApplicationVersion").Value, 10);
+                lApplicationProgramNode.Attributes.GetNamedItem("ApplicationVersion").Value = lAppVersion.ToString();
+                string lReplVersions = lMcVersionNode.Attributes.GetNamedItem("ReplacesVersions").Value;
+                lApplicationProgramNode.Attributes.GetNamedItem("ReplacesVersions").Value = lReplVersions;;
+                int lAppRevision = Convert.ToInt32(lMcVersionNode.Attributes.GetNamedItem("ApplicationRevision").Value, 10);
+                // now we calculate according versioning verification string
+                lInlineData = string.Format("0000{0:X4}{1:X2}00", lCalcAppNumber, lAppVersion-lAppRevision);
+                XmlNode lLdCtrlCompareProp = iTargetNode.SelectSingleNode("//LdCtrlCompareProp");
+                if (lLdCtrlCompareProp != null) {
+                    lLdCtrlCompareProp.Attributes.GetNamedItem("InlineData").Value = lInlineData;
+                }
+                // we create a comment from versio node
+                string lVersion = " " + string.Join(" ", lMcVersionNode.OuterXml.Split().Skip(1).SkipLast(2)) + " ";
+                XmlNode lVersionComment = ((XmlDocument)iTargetNode).CreateComment(lVersion);
+                lMcVersionNode.ParentNode.ReplaceChild(lVersionComment, lMcVersionNode);
+                // finally, we make some version info available in header file
+                mHeaderGenerated.AppendFormat("#define MAIN_OpenKnxId 0x{0:X2}", lOpenKnxId);
+                mHeaderGenerated.AppendLine();
+                mHeaderGenerated.AppendFormat("#define MAIN_ApplicationNumber {0}", lAppNumber);
+                mHeaderGenerated.AppendLine();
+                mHeaderGenerated.AppendFormat("#define MAIN_ApplicationVersion {0}", lAppVersion-lAppRevision);
+                mHeaderGenerated.AppendLine();
+            }
             // set the right Size attributes
             XmlNodeList lNodes = iTargetNode.SelectNodes("(//RelativeSegment | //LdCtrlRelSegment | //LdCtrlWriteRelMem)[@Size]");
             // string lSize = (mChannelCount * mParameterBlockSize + mParameterBlockOffset).ToString();
@@ -349,7 +395,6 @@ namespace MultiplyChannels {
             }
             Console.WriteLine("- Final parameter size is {0}", lSize);
             // change all Id-Attributes / renumber ParameterSeparator and ParameterBlock
-            XmlNode lApplicationProgramNode = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/ApplicationPrograms/ApplicationProgram");
             string lApplicationId = lApplicationProgramNode.Attributes.GetNamedItem("Id").Value;
             int lApplicationNumber = -1;
             bool lIsInt = int.TryParse(lApplicationProgramNode.Attributes.GetNamedItem("ApplicationNumber").Value, out lApplicationNumber);
@@ -377,6 +422,7 @@ namespace MultiplyChannels {
                 }
             }
             Console.WriteLine("- ApplicationNumber: {0}, ApplicationVersion: {1}, old ID is: {3}, new (calculated) ID is: {2}", lApplicationNumber, lApplicationVersion, lNewId, lOldId);
+            if (lInlineData != "") Console.WriteLine("- Calculated InlineData for Versioning: {0}", lInlineData);
 
             // create registration entry
             XmlNode lHardwareVersionAttribute = iTargetNode.SelectSingleNode("/KNX/ManufacturerData/Manufacturer/Hardware/Hardware/@VersionNumber");
@@ -484,18 +530,18 @@ namespace MultiplyChannels {
             return lResult;
         }
 
-        public void ExportHeaderKoStart(StringBuilder cOut, string iHeaderPrefixName) {
+        private void ExportHeaderKoStart(DefineContent iDefine, StringBuilder cOut, string iHeaderPrefixName) {
             if (!mHeaderKoStartGenerated) {
                 StringBuilder lOut = new StringBuilder();
                 mHeaderKoStartGenerated = ExportHeaderKo(lOut, iHeaderPrefixName);
-                if (mHeaderKoStartGenerated) {
+                if (mHeaderKoStartGenerated && iDefine.IsParameter) {
                     cOut.AppendLine("// Communication objects with single occurance");
                     cOut.Append(lOut);
                 }
             }
         }
 
-        public void ExportHeaderKoBlock(StringBuilder cOut, string iHeaderPrefixName) {
+        private void ExportHeaderKoBlock(DefineContent iDefine, StringBuilder cOut, string iHeaderPrefixName) {
             if (!mHeaderKoBlockGenerated) {
                 XmlNodeList lComObjects = mDocument.SelectNodes("//ComObjectTable/ComObject");
                 mKoBlockSize = lComObjects.Count;
@@ -503,11 +549,13 @@ namespace MultiplyChannels {
                 StringBuilder lOut = new StringBuilder();
                 mHeaderKoBlockGenerated = ExportHeaderKo(lOut, iHeaderPrefixName);
                 if (mHeaderKoBlockGenerated) {
-                    cOut.AppendLine("// Communication objects per channel (multiple occurance)");
-                    cOut.AppendFormat("#define {0}KoOffset {1}", iHeaderPrefixName, mKoOffset);
-                    cOut.AppendLine();
-                    cOut.AppendFormat("#define {0}KoBlockSize {1}", iHeaderPrefixName, mKoBlockSize);
-                    cOut.AppendLine();
+                    if (iDefine.IsTemplate) {
+                        cOut.AppendLine("// Communication objects per channel (multiple occurance)");
+                        cOut.AppendFormat("#define {0}KoOffset {1}", iHeaderPrefixName, mKoOffset);
+                        cOut.AppendLine();
+                        cOut.AppendFormat("#define {0}KoBlockSize {1}", iHeaderPrefixName, mKoBlockSize);
+                        cOut.AppendLine();
+                    }
                     cOut.Append(lOut);
                 }
             }
@@ -526,28 +574,28 @@ namespace MultiplyChannels {
             return lResult;
         }
 
-        public void ExportHeaderParameterStart(StringBuilder cOut, XmlNode iParameterTypesNode, string iHeaderPrefixName) {
-            if (!mHeaderParameterStartGenerated) {
+        private void ExportHeaderParameterStart(DefineContent iDefine, StringBuilder cOut, XmlNode iParameterTypesNode, string iHeaderPrefixName) {
+            if (!mHeaderParameterStartGenerated && iDefine.IsParameter) {
                 cOut.AppendLine("// Parameter with single occurance");
                 ExportHeaderParameter(cOut, iParameterTypesNode, iHeaderPrefixName);
                 mHeaderParameterStartGenerated = true;
             }
         }
 
-        public void ExportHeaderParameterBlock(StringBuilder cOut, XmlNode iParameterTypesNode, string iHeaderPrefixName) {
+        private void ExportHeaderParameterBlock(DefineContent iDefine, StringBuilder cOut, XmlNode iParameterTypesNode, string iHeaderPrefixName) {
             if (!mHeaderParameterBlockGenerated) {
-                if (mParameterBlockOffset > 0 && mParameterBlockSize > 0) {
-                    // cOut.AppendFormat("#define {0}Channels {1}", iHeaderPrefixName, mChannelCount);
-                    // cOut.AppendLine();
-                    // cOut.AppendLine();
+                if (iDefine.IsTemplate) {
+                    cOut.AppendFormat("#define {0}ChannelCount {1}", iHeaderPrefixName, mChannelCount);
+                    cOut.AppendLine();
+                    cOut.AppendLine();
                     cOut.AppendLine("// Parameter per channel");
                     cOut.AppendFormat("#define {0}ParamBlockOffset {1}", iHeaderPrefixName, mParameterBlockOffset);
                     cOut.AppendLine();
                     cOut.AppendFormat("#define {0}ParamBlockSize {1}", iHeaderPrefixName, mParameterBlockSize);
                     cOut.AppendLine();
-                    int lSize = ExportHeaderParameter(cOut, iParameterTypesNode, iHeaderPrefixName);
-                    // if (lSize != mParameterBlockSize) throw new ArgumentException(string.Format("ParameterBlockSize {0} calculation differs from header filie calculated ParameterBlockSize {1}", mParameterBlockSize, lSize));
                 }
+                int lSize = ExportHeaderParameter(cOut, iParameterTypesNode, iHeaderPrefixName);
+                // if (lSize != mParameterBlockSize) throw new ArgumentException(string.Format("ParameterBlockSize {0} calculation differs from header filie calculated ParameterBlockSize {1}", mParameterBlockSize, lSize));
                 mHeaderParameterBlockGenerated = true;
             }
         }
@@ -700,6 +748,7 @@ namespace MultiplyChannels {
                 string lXPath = lIncludeNode.Attributes.GetNamedItemValueOrEmpty("xpath");
                 XmlNodeList lChildren = lInclude.SelectNodes(lXPath);
                 string lHeaderFileName = Path.Combine(iCurrentDir, lDefine.header);
+                lInclude.ModuleType = lDefine.ModuleType;
                 if (lChildren.Count > 0 && "Parameter | Union | ComObject | SNIPPET".Contains(lChildren[0].LocalName)) {
                     if (lDefine.IsTemplate) {
                         // at this point we are including a template file
@@ -708,10 +757,10 @@ namespace MultiplyChannels {
                         lInclude.KoOffset = lDefine.KoOffset;
                         lInclude.ReplaceKeys = lDefine.ReplaceKeys;
                         lInclude.ReplaceValues = lDefine.ReplaceValues;
-                        ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
+                        ExportHeader(lDefine, lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
                     }
                     else if (lDefine.IsParameter) {
-                        ExportHeader(lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
+                        ExportHeader(lDefine, lHeaderFileName, lHeaderPrefixName, lInclude, lChildren);
                     }
                 }
                 // here we do template processing and repeat the template as many times as
@@ -747,7 +796,7 @@ namespace MultiplyChannels {
             // catch { }
         }
 
-        public void ExportHeader(string iHeaderFileName, string iHeaderPrefixName, ProcessInclude iInclude, XmlNodeList iChildren = null) {
+        private void ExportHeader(DefineContent iDefine, string iHeaderFileName, string iHeaderPrefixName, ProcessInclude iInclude, XmlNodeList iChildren = null) {
             // iInclude.ParseHeaderFile(iHeaderFileName);
 
             if (mParameterTypesNode == null) {
@@ -774,12 +823,12 @@ namespace MultiplyChannels {
             }
             // Header file generation is only possible before we resolve includes
             // First we serialize local parameters of this instance
-            ExportHeaderParameterStart(mHeaderGenerated, mParameterTypesNode, iHeaderPrefixName);
+            ExportHeaderParameterStart(iDefine, mHeaderGenerated, mParameterTypesNode, iHeaderPrefixName);
             // followed by template parameters of the include
-            if (iInclude != this) iInclude.ExportHeaderParameterBlock(mHeaderGenerated, mParameterTypesNode, iHeaderPrefixName);
+            if (iInclude != this) iInclude.ExportHeaderParameterBlock(iDefine, mHeaderGenerated, mParameterTypesNode, iHeaderPrefixName);
 
-            ExportHeaderKoStart(mHeaderGenerated, iHeaderPrefixName);
-            if (iInclude != this) iInclude.ExportHeaderKoBlock(mHeaderGenerated, iHeaderPrefixName);
+            ExportHeaderKoStart(iDefine, mHeaderGenerated, iHeaderPrefixName);
+            if (iInclude != this) iInclude.ExportHeaderKoBlock(iDefine, mHeaderGenerated, iHeaderPrefixName);
         }
     }
 }

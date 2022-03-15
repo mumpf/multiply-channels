@@ -390,6 +390,8 @@ namespace MultiplyChannels {
             string lIdPart = "";
             foreach (var lKeyValuePair in gIds) {
                 string lId = lKeyValuePair.Key;
+                string lIdMatch = "";
+                string lIdMatchReadable = "";
                 lId = lId.Replace(lApplicationId, "");
                 XmlNode lElement = lKeyValuePair.Value;
                 switch (lElement.Name)
@@ -400,9 +402,13 @@ namespace MultiplyChannels {
                         } else {
                             lIdPart = "_P-";
                         }
+                        lIdMatch = lIdPart + @"[1-3]?\d\d{6}";
+                        lIdMatchReadable = lIdPart + "tcccnnn";
                         break;
                     case "ComObject":
                         lIdPart = "_O-";
+                        lIdMatch = lIdPart + @"[1-3]?\d\d{6}";
+                        lIdMatchReadable = lIdPart + "tcccnnn";
                         break;
                     case "ParameterType":
                     case "Enumeration":
@@ -412,6 +418,8 @@ namespace MultiplyChannels {
                     case "ComObjectRef":
                         lIdPart = "_R-";
                         if (lId.Contains(lIdPart)) lIdPart = "";
+                        lIdMatch = @"([1-3]?\d\d{6})_R-\1\d\d";
+                        lIdMatchReadable = "tcccnnn_R-tcccnnnrr";
                         break;
                     case "ParameterBlock":
                         lIdPart = "_PB-";
@@ -436,6 +444,9 @@ namespace MultiplyChannels {
                 }
                 if (lIdPart != "" && !lId.StartsWith(lIdPart)) {
                     WriteFail(ref lFailPart, "{0} {1} has the Id={2}, but this Id is missing the required part {3}", lElement.Name, lElement.NodeAttr("Name"), lKeyValuePair.Key, lIdPart);
+                }
+                if (lIdMatch != "" && !Regex.IsMatch(lId, lIdMatch)) {
+                    WriteFail(ref lFailPart, "{0} {1} has the Id={2}, but this Id has not the OpenKNX-Format {3}", lElement.Name, lElement.NodeAttr("Name"), lKeyValuePair.Key, lIdMatchReadable);
                 }
             }
             if (!lFailPart) Console.WriteLine(" OK");
